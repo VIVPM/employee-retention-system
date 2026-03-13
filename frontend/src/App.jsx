@@ -24,6 +24,52 @@ function App() {
   const [trainingFile, setTrainingFile] = useState(null)
   const eventSourceRef = useRef(null)
 
+  // Model Versioning State
+  const [modelVersions, setModelVersions] = useState([])
+  const [selectedVersion, setSelectedVersion] = useState('')
+  const [loadedVersion, setLoadedVersion] = useState(null)
+  const [loadingModels, setLoadingModels] = useState(true)
+  const [loadingSpecificModel, setLoadingSpecificModel] = useState(false)
+
+  const fetchModels = async (justTrained = false) => {
+    setLoadingModels(true)
+    try {
+      const res = await fetch('http://localhost:8000/models')
+      const data = await res.json()
+      const versions = data.models || []
+      setModelVersions(versions)
+      if (versions.length > 0) {
+        setSelectedVersion(versions[0].version)
+        if (justTrained) {
+          setLoadedVersion(versions[0].version)
+        }
+      }
+    } catch (e) {
+      console.error("Could not fetch models", e)
+    } finally {
+      setLoadingModels(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchModels()
+  }, [])
+
+  const handleLoadModel = async () => {
+    if (!selectedVersion) return
+    setLoadingSpecificModel(true)
+    try {
+      const res = await fetch(`http://localhost:8000/models/load/${selectedVersion}`, { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to download model from Hugging Face')
+      setLoadedVersion(selectedVersion)
+      alert(`✅ Successfully loaded ${selectedVersion} for predictions!`)
+    } catch (e) {
+      alert(`Error loading model: ${e.message}`)
+    } finally {
+      setLoadingSpecificModel(false)
+    }
+  }
+
   // On page load: check if training was running and restore logs
   useEffect(() => {
     const checkAndRestoreLogs = async () => {
@@ -62,6 +108,7 @@ function App() {
       if (message === 'TRAINING_COMPLETE') {
         setTrainingLogs(prev => [...prev, '==================================', 'SUCCESS: Model Training Complete!', '=================================='])
         setIsTraining(false)
+        fetchModels(true)
         eventSource.close()
       } else if (message.startsWith('TRAINING_FAILED')) {
         setTrainingLogs(prev => [...prev, `CRITICAL ERROR: ${message}`])
@@ -125,7 +172,19 @@ function App() {
       })
 
       if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`)
+        let errMsg = `Server returned ${response.status}`
+        try {
+          const errText = await response.text()
+          if (errText) {
+            // If it's HTML (likely a proxy error), just use the status code
+            if (errText.trim().startsWith('<!DOCTYPE')) {
+              errMsg = `Server Error (${response.status})`
+            } else {
+              errMsg = errText.replace(/"/g, '') // Remove quotes if JSON string
+            }
+          }
+        } catch (e) {}
+        throw new Error(errMsg)
       }
 
       const data = await response.text()
@@ -161,7 +220,13 @@ function App() {
         let errMsg = `Server returned ${response.status}`
         try {
           const errText = await response.text()
-          if (errText) errMsg = errText
+          if (errText) {
+             if (errText.trim().startsWith('<!DOCTYPE')) {
+              errMsg = `Server Error (${response.status})`
+            } else {
+              errMsg = errText.replace(/"/g, '')
+            }
+          }
         } catch (e) {}
         throw new Error(errMsg)
       }
@@ -212,7 +277,18 @@ function App() {
       })
 
       if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`)
+        let errMsg = `Server returned ${response.status}`
+        try {
+          const errText = await response.text()
+          if (errText) {
+             if (errText.trim().startsWith('<!DOCTYPE')) {
+              errMsg = `Server Error (${response.status})`
+            } else {
+              errMsg = errText.replace(/"/g, '')
+            }
+          }
+        } catch (e) {}
+        throw new Error(errMsg)
       }
 
       // Connect SSE stream for live logs
@@ -264,8 +340,70 @@ function App() {
         </p>
       </header>
 
-      <main className="form-wrapper">
-        <div className="nav-bar">
+      <main className="main-layout" style={{ display: 'flex', gap: '20px', maxWidth: '1200px', margin: '0 auto', alignItems: 'flex-start' }}>
+        
+        {/* Model Registry Sidebar */}
+        <aside className="models-sidebar" style={{ flex: '0 0 300px', backgroundColor: 'var(--surface-color)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)', marginTop: '20px' }}>
+          <h2 style={{ fontSize: '1.2rem', marginTop: 0, color: 'var(--primary-color)' }}>Model Registry</h2>
+          <p style={{ fontSize: '0.9rem', color: '#888', marginBottom: '20px' }}>Select a Hugging Face model version to download and use for inference.</p>
+
+          {loadingModels ? (
+            <div className="alert alert-loading" style={{ margin: 0, padding: '10px' }}>Loading versions...</div>
+          ) : modelVersions.length === 0 ? (
+            <div className="alert alert-error" style={{ margin: 0, padding: '10px' }}>No models found on Hub.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <select
+                className="input-field"
+                value={selectedVersion}
+                onChange={e => setSelectedVersion(e.target.value)}
+                style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-color)', color: 'var(--text-color)' }}
+              >
+                {modelVersions.map(m => {
+                  const displayStatus = m.status && m.status !== 'None' ? ` (${m.status})` : ''
+                  return (
+                    <option key={m.version} value={m.version}>
+                      Version {m.version}{displayStatus}
+                    </option>
+                  )
+                })}
+              </select>
+              
+              {/* Date label for selected version */}
+              {modelVersions.find(m => m.version === selectedVersion)?.date && (
+                <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                  📅 Trained: {modelVersions.find(m => m.version === selectedVersion).date}
+                </div>
+              )}
+
+              {/* Metrics Display */}
+              {modelVersions.find(m => m.version === selectedVersion)?.metrics && Object.keys(modelVersions.find(m => m.version === selectedVersion).metrics).length > 0 && (
+                <div style={{ fontSize: '0.85rem', backgroundColor: 'rgba(59,130,246,0.1)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.3)', lineHeight: '1.6' }}>
+                  <strong>🏆 Best Model:</strong> <span style={{color: 'var(--primary-color)'}}>{modelVersions.find(m => m.version === selectedVersion).metrics.best_model}</span> <br />
+                  <strong>📈 Top AUC:</strong> <span style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>{modelVersions.find(m => m.version === selectedVersion).metrics.accuracy}</span>
+                </div>
+              )}
+
+              {selectedVersion !== loadedVersion && loadedVersion !== null && (
+                <div style={{ fontSize: '0.85rem', color: '#ff9800', lineHeight: '1.4' }}>
+                  ⚠️ To use this version for <strong>Inference</strong>, click Load below.
+                </div>
+              )}
+              
+              <button
+                className="submit-btn"
+                onClick={handleLoadModel}
+                disabled={loadingSpecificModel || isTraining}
+                style={{ padding: '10px', backgroundColor: loadedVersion === selectedVersion ? 'var(--success-color)' : 'var(--primary-color)' }}
+              >
+                {loadingSpecificModel ? <span className="loader" style={{width: '16px', height: '16px'}}></span> : (loadedVersion === selectedVersion ? '✅ Loaded Active' : '📥 Load Selected Model')}
+              </button>
+            </div>
+          )}
+        </aside>
+
+        <div className="form-wrapper" style={{ flex: 1, margin: '20px 0' }}>
+          <div className="nav-bar">
           <button 
             className={`nav-btn ${activeTab === 'training' ? 'active' : ''}`}
             onClick={() => setActiveTab('training')}
@@ -565,9 +703,9 @@ function App() {
           </form>
           </>
           )}
+          </div>
         </div>
       </main>
-
 
     </div>
   )

@@ -8,3 +8,5 @@ scikit-learn
 kneed
 xgboost
 Jinja2
+huggingface_hub
+python-dotenv

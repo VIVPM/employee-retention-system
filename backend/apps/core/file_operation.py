@@ -45,27 +45,26 @@ class FileOperation:
         """
         try:
             self.logger.info('Start of Save Models')
-            path = os.path.join('apps/models/',file_name) #create seperate directory for each cluster
-            if os.path.isdir(path): #remove previously existing models for each clusters
-                shutil.rmtree('apps/models')
-                os.makedirs(path)
-            else:
-                os.makedirs(path) #
-            with open(path +'/' + file_name+'.sav',
-                      'wb') as f:
-                pickle.dump(model, f) # save the model to file
-            self.logger.info('Model File '+file_name+' saved')
+            # Models are saved during training to apps/models before upload
+            path = os.path.join('apps/models/',file_name) 
+            if os.path.isdir(path): 
+                shutil.rmtree(path) # Just remove the specific model folder
+            os.makedirs(path, exist_ok=True)
+            
+            with open(os.path.join(path, file_name + '.sav'), 'wb') as f:
+                pickle.dump(model, f) 
+            self.logger.info('Model File '+file_name+' saved to apps/models/')
             self.logger.info('End of Save Models')
             return 'success'
         except Exception as e:
             self.logger.exception('Exception raised while Save Models: %s' % e)
             raise Exception()
 
-    def load_model(self,file_name):
+    def load_model(self, file_name, base_path=None):
         """
         * method: load_model
         * description: method to load the model file
-        * return: File gets saved
+        * return: Model object
         *
         * who             when           version  change (include bug# if apply)
         * ----------      -----------    -------  ------------------------------
@@ -73,34 +72,33 @@ class FileOperation:
         *
         * Parameters
         *   file_name:
+        *   base_path: (optional) The directory to load models from
         """
         try:
             self.logger.info('Start of Load Model')
-            with open('apps/models/' + file_name + '/' + file_name + '.sav','rb') as f:
-                self.logger.info('Model File ' + file_name + ' loaded')
+            # If no base_path is provided, we fail explicitly to avoid 'ghost' local loads
+            if not base_path:
+                raise ValueError("base_path must be provided for model loading (Hub-centric)")
+            
+            load_dir = base_path
+            model_path = os.path.join(load_dir, file_name, file_name + '.sav')
+            
+            with open(model_path, 'rb') as f:
+                self.logger.info('Model File ' + file_name + ' loaded from ' + load_dir)
                 self.logger.info('End of Load Model')
                 return pickle.load(f)
         except Exception as e:
             self.logger.exception('Exception raised while Loading Model: %s' % e)
             raise Exception()
 
-    def correct_model(self,cluster_number):
-        """
-        * method: correct_model
-        * description: method to find best model
-        * return:  The Model file
-        *
-        * who             when           version  change (include bug# if apply)
-        * ----------      -----------    -------  ------------------------------
-        * VIVEK           11-MAR-2026    1.0      initial creation
-        *
-        * Parameters
-        *   cluster_number:
-        """
+    def correct_model(self, cluster_number, base_path=None):
         try:
             self.logger.info('Start of finding correct model')
-            self.cluster_number= cluster_number
-            self.folder_name='apps/models'
+            if not base_path:
+                raise ValueError("base_path must be provided for model selection (Hub-centric)")
+                
+            self.cluster_number = cluster_number
+            self.folder_name = base_path
             self.list_of_model_files = []
             self.list_of_files = os.listdir(self.folder_name)
             for self.file in self.list_of_files:
@@ -110,7 +108,7 @@ class FileOperation:
                 except:
                     continue
             self.model_name=self.model_name.split('.')[0]
-            self.logger.info('End of finding correct model')
+            self.logger.info('End of finding correct model from ' + base_path)
             return self.model_name
         except Exception as e:
             self.logger.info('Exception raised while finding correct model' + str(e))

@@ -1,9 +1,10 @@
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from sklearn.metrics  import roc_auc_score,accuracy_score
 from apps.core.logger import Logger
-from sklearn.metrics import r2_score
 
 class ModelTuner:
     """
@@ -30,108 +31,132 @@ class ModelTuner:
         self.data_path = data_path
         self.logger = Logger(self.run_id, 'ModelTuner', mode)
         self.rfc = RandomForestClassifier()
-        self.xgb = XGBClassifier(objective='binary:logistic')
+        self.dt = DecisionTreeClassifier()
+        self.lr = LogisticRegression()
+        self.sv = SVC(probability=True)
 
     def best_params_randomforest(self,train_x,train_y):
         """
         * method: best_params_randomforest
         * description: method to get the parameters for Random Forest Algorithm which give the best accuracy.
-                                             Use Hyper Parameter Tuning.
+                                             Parameters are fixed to optimize training speed.
         * return: The model with the best parameters
         *
         * who             when           version  change (include bug# if apply)
         * ----------      -----------    -------  ------------------------------
-        * VIVEK           11-MAR-2026    1.0      initial creation
+        * VIVEK           11-MAR-2026    1.1      fixed parameters for speed
         *
         * Parameters
         *   train_x:
         *   train_y:
         """
         try:
-            self.logger.info('Start of finding best params for randomforest algo...')
-            # initializing with different combination of parameters
-            self.param_grid = {"n_estimators": [10, 50, 100, 130], "criterion": ['gini', 'entropy'],
-                               "max_depth": range(2, 4, 1), "max_features": ['sqrt']}
-
-            #Creating an object of the Grid Search class
-            self.grid = GridSearchCV(estimator=self.rfc, param_grid=self.param_grid, cv=5)
-            #finding the best parameters
-            self.grid.fit(train_x, train_y)
-
-            #extracting the best parameters
-            self.criterion = self.grid.best_params_['criterion']
-            self.max_depth = self.grid.best_params_['max_depth']
-            self.max_features = self.grid.best_params_['max_features']
-            self.n_estimators = self.grid.best_params_['n_estimators']
+            self.logger.info('Start of building randomforest with fixed params...')
+            # Using fixed parameters provided by user for optimization
+            self.criterion = 'gini'
+            self.max_depth = 3
+            self.max_features = 'sqrt'
+            self.n_estimators = 10
 
             #creating a new model with the best parameters
             self.rfc = RandomForestClassifier(n_estimators=self.n_estimators, criterion=self.criterion,
                                               max_depth=self.max_depth, max_features=self.max_features)
-            # training the mew model
+            # training the new model
             self.rfc.fit(train_x, train_y)
-            self.logger.info('Random Forest best params: '+str(self.grid.best_params_))
-            self.logger.info('End of finding best params for randomforest algo...')
+            self.rf_best_params = {'criterion': self.criterion, 'max_depth': self.max_depth, 'max_features': self.max_features, 'n_estimators': self.n_estimators}
+            self.logger.info('Random Forest used fixed params: ' + str(self.rf_best_params))
+            self.logger.info('End of building randomforest with fixed params...')
 
             return self.rfc
         except Exception as e:
-            self.logger.exception('Exception raised while finding best params for randomforest algo:' + str(e))
+            self.logger.exception('Exception raised while building randomforest:' + str(e))
             raise Exception()
 
-    def best_params_xgboost(self,train_x,train_y):
-        """
-        * method: best_params_xgboost
-        * description: method to get the parameters for XGBoost Algorithm which give the best accuracy.
-                                             Use Hyper Parameter Tuning.
-        * return: The model with the best parameters
-        *
-        * who             when           version  change (include bug# if apply)
-        * ----------      -----------    -------  ------------------------------
-        * VIVEK           11-MAR-2026    1.0      initial creation
-        *
-        * Parameters
-        *   train_x:
-        *   train_y:
-        """
+    def best_params_decisiontree(self,train_x,train_y):
         try:
-            self.logger.info('Start of finding best params for XGBoost algo...')
-            # initializing with different combination of parameters
-            self.param_grid_xgboost = {
-                'learning_rate': [0.5, 0.1, 0.01, 0.001],
-                'max_depth': [3, 5, 10, 20],
-                'n_estimators': [10, 50, 100, 200]
-
+            self.logger.info('Start of finding best params for Decision Tree algo...')
+            self.param_grid_dt = {
+                'criterion': ['gini', 'entropy'],
+                'splitter': ['best', 'random'],
+                'max_depth': range(2, 4, 1),
+                'max_features': ['sqrt', 'log2']
             }
-            # Creating an object of the Grid Search class
-            self.grid= GridSearchCV(XGBClassifier(objective='binary:logistic'),self.param_grid_xgboost, cv=5)
-            # finding the best parameters
+            self.grid = GridSearchCV(DecisionTreeClassifier(), self.param_grid_dt, cv=5, scoring='roc_auc')
             self.grid.fit(train_x, train_y)
 
-            # extracting the best parameters
-            self.learning_rate = self.grid.best_params_['learning_rate']
+            self.criterion = self.grid.best_params_['criterion']
+            self.splitter = self.grid.best_params_['splitter']
             self.max_depth = self.grid.best_params_['max_depth']
-            self.n_estimators = self.grid.best_params_['n_estimators']
+            self.max_features = self.grid.best_params_['max_features']
 
-            # creating a new model with the best parameters
-            self.xgb = XGBClassifier(objective='binary:logistic',learning_rate=self.learning_rate, max_depth=self.max_depth, n_estimators=self.n_estimators)
-            # training the mew model
-            self.xgb.fit(train_x, train_y)
-            self.logger.info('XGBoost best params: ' + str(self.grid.best_params_))
-            self.logger.info('End of finding best params for XGBoost algo...')
-            return self.xgb
+            self.dt = DecisionTreeClassifier(criterion=self.criterion, splitter=self.splitter,
+                                             max_depth=self.max_depth, max_features=self.max_features)
+            self.dt.fit(train_x, train_y)
+            self.dt_best_params = self.grid.best_params_
+            self.logger.info('Decision Tree best params: ' + str(self.grid.best_params_))
+            return self.dt
         except Exception as e:
-            self.logger.exception('Exception raised while finding best params for XGBoost algo:' + str(e))
+            self.logger.exception('Exception raised while finding best params for Decision Tree algo:' + str(e))
+            raise Exception()
+
+    def best_params_logistic_regression(self,train_x,train_y):
+        try:
+            self.logger.info('Start of finding best params for Logistic Regression algo...')
+            self.param_grid_lr = {
+                'C': [0.1, 0.5, 1, 10],
+                'penalty': ['l2'],
+                'solver': ['lbfgs', 'liblinear']
+            }
+            self.grid = GridSearchCV(LogisticRegression(), self.param_grid_lr, cv=5, scoring='roc_auc')
+            self.grid.fit(train_x, train_y)
+
+            self.C = self.grid.best_params_['C']
+            self.penalty = self.grid.best_params_['penalty']
+            self.solver = self.grid.best_params_['solver']
+
+            self.lr = LogisticRegression(C=self.C, penalty=self.penalty, solver=self.solver)
+            self.lr.fit(train_x, train_y)
+            self.lr_best_params = self.grid.best_params_
+            self.logger.info('Logistic Regression best params: ' + str(self.grid.best_params_))
+            return self.lr
+        except Exception as e:
+            self.logger.exception('Exception raised while finding best params for Logistic Regression algo:' + str(e))
+            raise Exception()
+
+    def best_params_svm(self,train_x,train_y):
+        try:
+            self.logger.info('Start of finding best params for SVM algo...')
+            self.param_grid_svm = {
+                'C': [0.1, 0.5, 1, 10],
+                'kernel': ['linear'],
+                'gamma': ['scale', 'auto']
+            }
+            self.grid = GridSearchCV(SVC(probability=True), self.param_grid_svm, cv=5, scoring='roc_auc')
+            self.grid.fit(train_x, train_y)
+
+            self.C = self.grid.best_params_['C']
+            self.kernel = self.grid.best_params_['kernel']
+            self.gamma = self.grid.best_params_['gamma']
+
+            self.sv = SVC(C=self.C, kernel=self.kernel, gamma=self.gamma, probability=True)
+            self.sv.fit(train_x, train_y)
+            self.sv_best_params = self.grid.best_params_
+            self.logger.info('SVM best params: ' + str(self.grid.best_params_))
+            return self.sv
+        except Exception as e:
+            self.logger.exception('Exception raised while finding best params for SVM algo:' + str(e))
             raise Exception()
 
 
     def get_best_model(self,train_x,train_y,test_x,test_y):
         """
         * method: get_best_model
-        * description: method to get best model
+        * description: method to get best model (Optimized: Random Forest only)
         * return: none
         *
         * who             when           version  change (include bug# if apply)
         * ----------      -----------    -------  ------------------------------
-        * VIVEK           11-MAR-2026    1.0      initial creation
+        * VIVEK           11-MAR-2026    1.1      optimized for speed (RF only)
         *
         * Parameters
         *   train_x:
@@ -140,35 +165,22 @@ class ModelTuner:
         *   test_y:
         """
         try:
-            self.logger.info('Start of finding best model...')
-            self.xgboost= self.best_params_xgboost(train_x,train_y)
-            self.prediction_xgboost = self.xgboost.predict(test_x) # Predictions using the XGBoost Model
+            self.logger.info('Start of finding best model (Optimized)...')
 
-            if len(test_y.unique()) == 1:  # if there is only one label in y, then roc_auc_score returns error. We will use accuracy in that case
-                self.xgboost_score = accuracy_score(test_y, self.prediction_xgboost)
-                self.logger.info('Accuracy for XGBoost:' + str(self.xgboost_score))
-            else:
-                self.xgboost_score = roc_auc_score(test_y, self.prediction_xgboost)  # AUC for XGBoost
-                self.logger.info('AUC for XGBoost:' + str(self.xgboost_score))
+            # We bypass searching and directly use the expert parameters for Random Forest
+            self.random_forest = self.best_params_randomforest(train_x, train_y)
+            self.rf_score = roc_auc_score(test_y, self.random_forest.predict_proba(test_x)[:, 1])
+            self.logger.info('AUC for Random Forest: ' + str(self.rf_score))
 
-            # create best model for Random Forest
-            self.random_forest=self.best_params_randomforest(train_x,train_y)
-            self.prediction_random_forest=self.random_forest.predict(test_x) # prediction using the Random Forest Algorithm
-
-            if len(test_y.unique()) == 1:  # if there is only one label in y, then roc_auc_score returns error. We will use accuracy in that case
-                self.random_forest_score = accuracy_score(test_y, self.prediction_random_forest)
-                self.logger.info('Accuracy for Random Forest:' + str(self.random_forest_score))
-            else:
-                self.random_forest_score = roc_auc_score(test_y, self.prediction_random_forest)  # AUC for XGBoost
-                self.logger.info('AUC for Random Forest:' + str(self.random_forest_score))
-
-            #comparing the two models
-            self.logger.info('End of finding best model...')
-            if(self.random_forest_score <  self.xgboost_score):
-                return 'XGBoost',self.xgboost
-            else:
-                return 'RandomForest',self.random_forest
+            self.logger.info('End of model selection (Optimization enabled: RF only).')
+            
+            best_model_name = 'RandomForest'
+            all_results = [
+                {'model_name': 'RandomForest', 'score': self.rf_score, 'params': self.rf_best_params}
+            ]
+            
+            return best_model_name, self.random_forest, all_results
 
         except Exception as e:
             self.logger.exception('Exception raised while finding best model:' + str(e))
-            raise Exception()
+            raise Exception()

@@ -26,9 +26,10 @@ class PredictModel:
     ****************************************************************************
     """
 
-    def __init__(self,run_id,data_path):
+    def __init__(self, run_id, data_path, base_path=None):
         self.run_id = run_id
         self.data_path = data_path
+        self.base_path = base_path
         self.logger = Logger(self.run_id, 'PredictModel', 'prediction')
         self.loadValidate = LoadValidate(self.run_id, self.data_path,'prediction')
         self.preProcess = Preprocessor(self.run_id, self.data_path,'prediction')
@@ -55,7 +56,7 @@ class PredictModel:
             #preprocessing activities
             self.X = self.preProcess.preprocess_predictset()
             #load model
-            kmeans = self.fileOperation.load_model('KMeans')
+            kmeans = self.fileOperation.load_model('KMeans', base_path=self.base_path)
             #cluster selection
             clusters = kmeans.predict(self.X.drop(['empid'],axis=1))
             self.X['clusters'] = clusters
@@ -66,8 +67,8 @@ class PredictModel:
                 self.logger.info('clusters loop started')
                 cluster_data = self.X[self.X['clusters'] == cluster_id]
                 cluster_data_new = cluster_data.drop(['empid','clusters'], axis=1)
-                model_name = self.fileOperation.correct_model(cluster_id)
-                model = self.fileOperation.load_model(model_name)
+                model_name = self.fileOperation.correct_model(cluster_id, base_path=self.base_path)
+                model = self.fileOperation.load_model(model_name, base_path=self.base_path)
                 y_predicted = model.predict(cluster_data_new)
                 
                 result = pd.DataFrame({"EmpId": cluster_data['empid'],"Prediction": y_predicted})
@@ -101,7 +102,7 @@ class PredictModel:
             #preprocessing activities
             self.X = self.preProcess.preprocess_predict(data)
             #load model
-            kmeans = self.fileOperation.load_model('KMeans')
+            kmeans = self.fileOperation.load_model('KMeans', base_path=self.base_path)
             #cluster selection
             clusters = kmeans.predict(self.X.drop(['empid'],axis=1))
             self.X['clusters'] = clusters
@@ -111,8 +112,8 @@ class PredictModel:
                 self.logger.info('clusters loop started')
                 cluster_data = self.X[self.X['clusters'] == i]
                 cluster_data_new = cluster_data.drop(['empid','clusters'], axis=1)
-                model_name = self.fileOperation.correct_model(i)
-                model = self.fileOperation.load_model(model_name)
+                model_name = self.fileOperation.correct_model(i, base_path=self.base_path)
+                model = self.fileOperation.load_model(model_name, base_path=self.base_path)
                 self.logger.info('Shape of Data '+str(cluster_data_new.shape))
                 self.logger.info('Shape of Data ' + str(cluster_data_new.info()))
                 y_predicted = model.predict(cluster_data_new)

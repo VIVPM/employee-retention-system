@@ -21,6 +21,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Global State for Model Registry
+app.state.active_model_path = None
+app.state.active_model_version = None
+
+def get_inference_guard():
+    if not app.state.active_model_path:
+        return PlainTextResponse("No model loaded. Please train the model first or select a version from the Model Registry.", status_code=400)
+    return None
+
 
 
 # Track current training run state
@@ -147,8 +156,12 @@ def batch_prediction_route_client():
         #get run id
         run_id = config.get_run_id()
         data_path = config.prediction_data_path
+
+        guard = get_inference_guard()
+        if guard: return guard
+
         #prediction object initialization
-        predictModel=PredictModel(run_id, data_path)
+        predictModel=PredictModel(run_id, data_path, base_path=app.state.active_model_path)
         #prediction the model
         predictModel.batch_predict_from_model()
         return PlainTextResponse("Prediction successfull! and its RunID is : "+str(run_id))
@@ -188,8 +201,11 @@ async def batch_predict_file_route(file: UploadFile = File(...)):
         if os.path.exists(results_file):
             os.remove(results_file)
 
+        guard = get_inference_guard()
+        if guard: return guard
+
         # Initialize and run prediction
-        predictModel = PredictModel(run_id, data_path)
+        predictModel = PredictModel(run_id, data_path, base_path=app.state.active_model_path)
         predictModel.batch_predict_from_model()
         
         # Check if predictions were generated
@@ -239,7 +255,6 @@ async def single_prediction_route_client(request: Request):
 
         data = pd.DataFrame(data=[[0 ,satisfaction_level, last_evaluation, number_project,average_monthly_hours,time_spend_company,work_accident,promotion_last_5years,salary]],
                           columns=['empid','satisfaction_level', 'last_evaluation', 'number_project','average_monthly_hours','time_spend_company','Work_accident','promotion_last_5years','salary'])
-        # using dictionary to convert specific columns
         convert_dict = {'empid': int,
                         'satisfaction_level': float,
                         'last_evaluation': float,
@@ -252,8 +267,11 @@ async def single_prediction_route_client(request: Request):
 
         data = data.astype(convert_dict)
 
+        guard = get_inference_guard()
+        if guard: return guard
+
         # object initialization
-        predictModel = PredictModel(run_id, data_path)
+        predictModel = PredictModel(run_id, data_path, base_path=app.state.active_model_path)
         # prediction the model
         output = predictModel.single_predict_from_model(data)
         print('output : '+str(output))
@@ -264,6 +282,76 @@ async def single_prediction_route_client(request: Request):
         return PlainTextResponse("Error Occurred! %s" % e, status_code=400)
     except Exception as e:
         return PlainTextResponse("Error Occurred! %s" % e, status_code=500)
+
+@app.get('/models')
+def list_models():
+    """Returns a list of available model versions from Hugging Face Hub"""
+    from fastapi.responses import JSONResponse
+    from apps.core.hf_uploader import HFUploader
+    import os, pandas as pd
+    try:
+        uploader = HFUploader(logger=Logger("system", "Main", "api"))
+        versions = uploader.list_models_versions()
+        
+        # Try to resolve metrics for the latest version from Hub instead of just local
+        if versions:
+            latest_v = versions[0]["version"]
+            # Get snapshot path for metrics (cached or downloaded)
+            snap_path = uploader.get_model_snapshot(tag_name=latest_v)
+            if snap_path:
+                res_path = os.path.join(snap_path, "results.csv")
+                if os.path.exists(res_path):
+                    try:
+                        df = pd.read_csv(res_path)
+                        selected = df[df['Selected'] == 'Yes'] if 'Selected' in df.columns else df
+                        best_row = selected.loc[selected['Best Score AUC'].idxmax()]
+                        versions[0]["metrics"] = {
+                            "accuracy": f"{best_row['Best Score AUC']*100:.2f}%",
+                            "best_model": best_row['Model Name'],
+                            "cluster": str(best_row['Cluster'])
+                        }
+                    except:
+                        pass
+
+        return JSONResponse({"models": versions})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "models": []}, status_code=500)
+
+@app.post('/models/load/{version}')
+def load_model(version: str):
+    """Downloads a specific model version tag from Hugging Face Hub"""
+    from fastapi.responses import JSONResponse
+    from apps.core.hf_uploader import HFUploader
+    import os, pandas as pd
+    try:
+        uploader = HFUploader(logger=Logger("system", "Main", "api"))
+        
+        # version will be a tag name like 'v1.0'
+        snapshot_path = uploader.get_model_snapshot(tag_name=version)
+        
+        if snapshot_path:
+            app.state.active_model_path = snapshot_path
+            app.state.active_model_version = version
+            
+            # Load metrics for the loaded version
+            metrics = None
+            results_path = os.path.join(snapshot_path, "results.csv")
+            if os.path.exists(results_path):
+                try:
+                    df = pd.read_csv(results_path)
+                    selected = df[df['Selected'] == 'Yes'] if 'Selected' in df.columns else df
+                    best_row = selected.loc[selected['Best Score AUC'].idxmax()]
+                    metrics = {
+                        "accuracy": f"{best_row['Best Score AUC']*100:.2f}%",
+                        "best_model": best_row['Model Name']
+                    }
+                except:
+                    pass
+            return JSONResponse({"message": f"Successfully loaded version {version} from Hugging Face Hub", "evaluation": metrics})
+        else:
+            return JSONResponse({"error": "Failed to resolve model snapshot from Hub"}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 if __name__ == "__main__":
     import uvicorn

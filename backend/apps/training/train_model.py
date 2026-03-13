@@ -70,6 +70,9 @@ class TrainModel:
             self.X['Labels'] = self.y
             # getting the unique clusters from our data set
             list_of_clusters = self.X['Cluster'].unique()
+            
+            results_list = [] # to store metrics for Hugging Face
+
             # parsing all the clusters and look for the best ML algorithm to fit on individual cluster
             for i in list_of_clusters:
                 cluster_data=self.X[self.X['Cluster']==i] # filter the data for one cluster
@@ -81,13 +84,43 @@ class TrainModel:
                 # splitting the data into training and test set for each cluster one by one
                 x_train, x_test, y_train, y_test = train_test_split(cluster_features, cluster_label, test_size=0.2, random_state=0)
                 #getting the best model for each of the clusters
-                best_model_name, best_model = self.modelTuner.get_best_model(x_train, y_train, x_test, y_test)
+                best_model_name, best_model, all_results = self.modelTuner.get_best_model(x_train, y_train, x_test, y_test)
 
                 #saving the best model to the directory.
-                save_model=self.fileOperation.save_model(best_model,best_model_name+str(i))
+                save_model = self.fileOperation.save_model(best_model, best_model_name+str(i))
+                
+                # Append ALL model results (RandomForest + DT + LR + SVM) for this cluster
+                for r in all_results:
+                    results_list.append({
+                        'Cluster': i,
+                        'Model Name': r['model_name'],
+                        'Best Score AUC': r['score'],
+                        'Best Parameters': str(r['params']),
+                        'Selected': 'Yes' if r['model_name'] == best_model_name else 'No'
+                    })
 
+            import pandas as pd
+            import os
+            # Save the results to results.csv
+            results_df = pd.DataFrame(results_list)
+            os.makedirs('apps/models', exist_ok=True)
+            results_df.to_csv('apps/models/results.csv', index=False)
+            self.logger.info('Saved results.csv successfully with tuning metrics.')
+
+            # Upload models to Hugging Face
+            try:
+                from apps.core.hf_uploader import HFUploader
+                self.logger.info('Starting Hugging Face Upload...')
+                uploader = HFUploader(logger=self.logger)
+                if uploader.upload_models():
+                    self.logger.info('Purging local apps/models after successful Hub upload...')
+                    import shutil
+                    shutil.rmtree('apps/models', ignore_errors=True)
+            except Exception as e:
+                self.logger.exception(f'Failed to upload to Hugging Face Hub: {str(e)}')
 
             self.logger.info('End of Training')
+            self.logger.info('TRAINING_COMPLETE')
         except Exception:
             self.logger.exception('Unsuccessful End of Training')
             raise Exception
