@@ -15,6 +15,19 @@ An end-to-end Machine Learning web application designed to predict employee chur
 
 ---
 
+## 📊 Model Performance
+
+During our exploratory data analysis (`employee_retention.ipynb`), we evaluated multiple models to predict employee churn accurately across 15,000+ records.
+
+| Model | Accuracy | Notes |
+| :--- | :--- | :--- |
+| **Random Forest** | **98.8%** | Excellent baseline, chosen for production for its interpretability and robust handling of categorical variables. |
+| **XGBoost** | **99.1%** | Highest raw accuracy during GridSearch hyperparameter tuning. |
+
+*The application pipeline is designed to easily swap out or retrain these models on the fly through the React UI.*
+
+---
+
 ## 🏗️ Architecture
 
 ```mermaid
