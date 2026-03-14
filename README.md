@@ -40,9 +40,20 @@ graph LR
 The model was evaluated using a 20% hold-out test set. The `RandomForestClassifier` emerged as the best performing model.
 
 - **Best Model:** Random Forest Classifier
-- **Parameters:** `max_depth=3`, `n_estimators=10`, `criterion='entropy'`
-- **Accuracy Score:** **91.43%**
+- **Parameters:** `max_depth=3`, `n_estimators=130`, `criterion='entropy'`
+- **Accuracy Score:** **91.43%** (on test set)
 - **Evaluation Method:** Stratified Train-Test Split (80/20)
+
+### 📊 Model Comparison (Grid Search Results)
+
+During the model selection phase, several algorithms were evaluated using 5-fold Cross-Validation:
+
+| Model | Best CV Score | Notes |
+| :--- | :--- | :--- |
+| **Random Forest** | **91.73%** | Robust performance, selected for final deployment. |
+| **Decision Tree** | 88.77% | Good baseline but prone to higher variance. |
+| **Logistic Regression** | 76.65% | Limited by linear decision boundaries. |
+| **Linear SVC** | 75.04% | Similar performance to Logistic Regression. |
 
 ## Project Structure
 
@@ -90,93 +101,6 @@ npm run dev
 
 ---
 
-## 📊 Model Performance
+## License
 
-During our exploratory data analysis (`employee_retention.ipynb`), we evaluated multiple models to predict employee churn accurately across 15,000+ records.
-
-| Model | Accuracy | Notes |
-| :--- | :--- | :--- |
-| **Random Forest** | **98.8%** | Excellent baseline, chosen for production for its interpretability and robust handling of categorical variables. |
-| **XGBoost** | **99.1%** | Highest raw accuracy during GridSearch hyperparameter tuning. |
-
-*The application pipeline is designed to easily swap out or retrain these models on the fly through the React UI.*
-
----
-
-## 🏗️ Architecture
-
-```mermaid
-graph TD
-    %% Frontend
-    User[👤 HR / Admin] -->|Interacts| React["⚛️ React Frontend<br>(frontend/)"]
-    
-    %% APIs
-    React -->|Single/Batch Predict| PredictAPI["⚡ FastAPI Predict Endpoint<br>(/predict, /predict_batch)"]
-    React -->|Upload Training Data| UploadAPI["📤 FastAPI Upload Endpoint<br>(/training)"]
-    React -->|SSE Connection| StreamAPI["📡 FastAPI Log Stream<br>(/training_stream)"]
-    
-    %% Backend Logic
-    subgraph Backend_Logic [FastAPI Server]
-        PredictAPI -->|Load Model| Model["🧠 ML Model<br>(Random Forest)"]
-        UploadAPI -->|Trigger Async| Trainer["⚙️ Training Thread"]
-        Trainer -->|Dump Logs| LogQueue["🗄️ Thread-Safe Queue"]
-        LogQueue -->|Yield Streams| StreamAPI
-    end
-
-    %% Data Layer
-    subgraph Storage [File Storage]
-        Trainer -->|Save pkl| ModelsDir["📂 /models<br>(preprocessor.pkl, model.pkl)"]
-        Trainer -->|Save logs| LogsDir["📂 /logs<br>(training runs)"]
-        PredictAPI -->|Read pkl| ModelsDir
-    end
-```
-
----
-
-## 🛠️ Set-up & Execution
-
-### 1. Requirements
-Ensure you have **Node.js** v18+ (for frontend) and **Python 3.9+** (for backend) installed.
-
-### 2. Backend Setup
-1.  Navigate to the backend directory:
-    ```bash
-    cd backend
-    ```
-2.  Install dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
-3.  Run Backend:
-    ```bash
-    uvicorn main:app --port 8000 --reload
-    ```
-
-### 3. Frontend Setup
-1.  Navigate to the frontend directory:
-    ```bash
-    cd frontend
-    ```
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-3.  Run Dev Server:
-    ```bash
-    npm run dev
-    ```
-4.  Open `http://localhost:5173` in your browser.
-
----
-
-## 📂 Project Structure
-
-*   **`frontend/`**: Vite + React application.
-    *   `src/components/`: UI components including Terminal UI and File Uploaders.
-    *   `src/App.css`: Modern styling and animations.
-*   **`backend/`**: FastAPI server.
-    *   `main.py`: API endpoints for predictions, file mapping, and SSE streams.
-    *   `app/core/`: Application settings and custom loggers.
-    *   `models/`: Directory holding compiled `.pkl` machine learning models.
-    *   `data/`: Directory for storing training CSV uploads.
-*   **`employee_retention.ipynb`**: Original Jupyter Notebook used for initial exploratory data analysis (EDA) and model prototyping.
+This project is licensed under the [MIT License](LICENSE).
