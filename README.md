@@ -4,13 +4,88 @@ An end-to-end Machine Learning web application designed to predict employee chur
 
 ---
 
-## 🚀 Key Features
+## System Architecture
 
-*   **Premium React UI**: A responsive, modern interface built with React, featuring tabbed navigation for Predictions and Model Training.
-*   **Machine Learning Pipeline**: Uses a Scikit-Learn **Random Forest Classifier** with a robust data preprocessing pipeline.
-*   **Real-time Model Training**: Train the model on new data directly from the UI. Features an animated, auto-scrolling terminal window that streams training logs live from the backend using Server-Sent Events (SSE).
-*   **Batch Predictions**: Upload a CSV file of employee data and instantly receive bulk predictions on who is likely to leave or stay.
-*   **Asynchronous Processing**: Model training runs in background threads on the FastAPI server, preventing UI blocking and allowing users to multi-task.
+```mermaid
+graph LR
+    %% Data Stage
+    subgraph Data_Pipeline ["1. Data Pipeline"]
+        Raw["HR Churn Dataset<br/>(CSV)"] -->|cleaning.py| Clean["Cleaned Data"]
+        Clean -->|preprocessing.py| Feat["Engineered Features<br/>(One-Hot Encoding, Scaling)"]
+    end
+
+    %% Training Stage
+    subgraph Training_Pipeline ["2. Model Training"]
+        Feat -->|model_trainer.py| RFC["Random Forest Classifier<br/>(Tuned Hyperparameters)"]
+        RFC -->|evaluate.py| Metrics["Evaluation Metrics<br/>(Accuracy, Precision, Recall)"]
+        RFC -->|Serialize| Artifacts["Model Artifact<br/>(.pkl)"]
+    end
+
+    %% Serving Stage
+    subgraph Deployment ["3. Inference & Serving"]
+        Artifacts -->|Load Model| API["FastAPI Backend<br/>(Port: 8000)"]
+        API -->|/predict| UI["React Frontend<br/>(Vite)"]
+        User["HR Manager"] -->|Input Employee Details| UI
+        UI -->|Show Prediction| User
+    end
+
+    %% Styling
+    style Data_Pipeline fill:#f9f9f9,stroke:#333
+    style Training_Pipeline fill:#e1f5fe,stroke:#01579b
+    style Deployment fill:#e8f5e9,stroke:#1b5e20
+```
+
+## Performance & Evaluation
+
+The model was evaluated using a 20% hold-out test set. The `RandomForestClassifier` emerged as the best performing model.
+
+- **Best Model:** Random Forest Classifier
+- **Parameters:** `max_depth=3`, `n_estimators=10`, `criterion='entropy'`
+- **Accuracy Score:** **91.43%**
+- **Evaluation Method:** Stratified Train-Test Split (80/20)
+
+## Project Structure
+
+```
+employee-retention-system/
+├── backend/
+│   ├── apps/           # API routes and logic
+│   ├── data/           # Stored models and CSVs
+│   ├── logs/           # Training and API logs
+│   ├── main.py         # FastAPI Entry point
+│   └── requirements.txt
+├── frontend/           # React + Vite application
+│   ├── src/            # Components and App logic
+│   ├── index.html
+│   └── package.json
+├── employee_retention.ipynb  # Original Exploratory Data Analysis (EDA)
+└── hr_employee_churn_data.csv # Dataset
+```
+
+## Technical Stack
+
+- **Frontend:** React (Vite), Modern CSS (Premium UI)
+- **Backend:** FastAPI, Uvicorn
+- **Machine Learning:** Scikit-learn, Pandas, NumPy, Matplotlib, Seaborn
+- **Model:** Random Forest Classifier
+
+---
+
+## How to Run
+
+### 1. Backend (FastAPI)
+```bash
+cd backend
+pip install -r requirements.txt
+python main.py
+```
+
+### 2. Frontend (React)
+```bash
+cd frontend
+npm install
+npm run dev
+```
 *   **Session Persistence**: Training logs and states are cached securely, so you can safely refresh the page without losing your live training progress.
 
 ---
