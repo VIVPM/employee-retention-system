@@ -16,7 +16,10 @@ app = FastAPI()
 # dashboard.bind(app)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://employee-retention-system.onrender.com",
+        "http://localhost:5173",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
