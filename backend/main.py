@@ -17,7 +17,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://employee-retention-system.onrender.com",
+        "https://employee-retention-system-frontend.onrender.com",
         "http://localhost:5173",
     ],
     allow_methods=["*"],
