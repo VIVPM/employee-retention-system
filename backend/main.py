@@ -28,6 +28,23 @@ app.add_middleware(
 app.state.active_model_path = None
 app.state.active_model_version = None
 
+# Auto-load latest model on startup
+@app.on_event("startup")
+def auto_load_latest_model():
+    try:
+        from apps.core.hf_uploader import HFUploader
+        uploader = HFUploader(logger=logging.getLogger('HFUploader'))
+        versions = uploader.list_models_versions()
+        if versions:
+            latest = versions[0]['version']
+            snapshot_path = uploader.get_model_snapshot(tag_name=latest)
+            if snapshot_path:
+                app.state.active_model_path = snapshot_path
+                app.state.active_model_version = latest
+                logging.getLogger('Main').info(f'Auto-loaded model {latest} on startup')
+    except Exception as e:
+        logging.getLogger('Main').info(f'No model to auto-load: {e}')
+
 def get_inference_guard():
     if not app.state.active_model_path:
         return PlainTextResponse("No model loaded. Please train the model first or select a version from the Model Registry.", status_code=400)

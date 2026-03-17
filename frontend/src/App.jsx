@@ -5,7 +5,17 @@ const API_URL = import.meta.env.VITE_API_URL || 'https://employee-retention-syst
 
 function App() {
   const [activeTab, setActiveTab] = useState('prediction')
-  
+
+  // Toast notification state
+  const [toast, setToast] = useState(null)
+  const toastTimer = useRef(null)
+
+  const showToast = (message, type = 'success') => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast({ message, type })
+    toastTimer.current = setTimeout(() => setToast(null), 4000)
+  }
+
   const [formData, setFormData] = useState({
     satisfaction_level: '',
     last_evaluation: '',
@@ -65,9 +75,9 @@ function App() {
       const res = await fetch(`${API_URL}/models/load/${selectedVersion}`, { method: 'POST' })
       if (!res.ok) throw new Error('Failed to download model from Hugging Face')
       setLoadedVersion(selectedVersion)
-      alert(`✅ Successfully loaded ${selectedVersion} for predictions!`)
+      showToast(`Successfully loaded ${selectedVersion} for predictions!`, 'success')
     } catch (e) {
-      alert(`Error loading model: ${e.message}`)
+      showToast(`Error loading model: ${e.message}`, 'error')
     } finally {
       setLoadingSpecificModel(false)
     }
@@ -710,6 +720,11 @@ function App() {
         </div>
       </main>
 
+      {toast && (
+        <div className={`toast toast-${toast.type}`} onClick={() => setToast(null)}>
+          {toast.message}
+        </div>
+      )}
     </div>
   )
 }
