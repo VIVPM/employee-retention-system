@@ -95,17 +95,15 @@ class ModelTuner:
             self.logger.info('Start of finding best params for Logistic Regression algo...')
             self.param_grid_lr = {
                 'C': [0.1, 0.5, 1, 10],
-                'penalty': ['l2'],
                 'solver': ['lbfgs', 'liblinear']
             }
             self.grid = GridSearchCV(LogisticRegression(class_weight='balanced', max_iter=1000), self.param_grid_lr, cv=5, scoring='recall')
             self.grid.fit(train_x, train_y)
 
             self.C = self.grid.best_params_['C']
-            self.penalty = self.grid.best_params_['penalty']
             self.solver = self.grid.best_params_['solver']
 
-            self.lr = LogisticRegression(C=self.C, penalty=self.penalty, solver=self.solver, class_weight='balanced', max_iter=1000)
+            self.lr = LogisticRegression(C=self.C, solver=self.solver, class_weight='balanced', max_iter=1000)
             self.lr.fit(train_x, train_y)
             self.lr_best_params = self.grid.best_params_
             self.logger.info('Logistic Regression best params: ' + str(self.grid.best_params_))
