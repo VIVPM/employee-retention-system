@@ -382,12 +382,6 @@ function App() {
                 })}
               </select>
               
-              {/* Date label for selected version */}
-              {modelVersions.find(m => m.version === selectedVersion)?.date && (
-                <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                  📅 Trained: {modelVersions.find(m => m.version === selectedVersion).date}
-                </div>
-              )}
 
               {/* Metrics Display */}
               {modelVersions.find(m => m.version === selectedVersion)?.metrics && Object.keys(modelVersions.find(m => m.version === selectedVersion).metrics).length > 0 && (
