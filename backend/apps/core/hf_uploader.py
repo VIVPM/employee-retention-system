@@ -92,7 +92,7 @@ class HFUploader:
             for idx, tag in enumerate(tags):
                 versions.append({
                     "version": tag.name,         
-                    "run_id": tag.commit,        # Tag points to a specific commit
+                    "run_id": getattr(tag, 'target_commit', getattr(tag, 'commit', tag.name)),
                     "status": "Active" if idx == 0 else "Archive",
                     "date": "N/A",               # refs.tags doesn't expose date easily, can be enhanced if needed
                     "metrics": {}                

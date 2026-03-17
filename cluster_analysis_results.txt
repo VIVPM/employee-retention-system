@@ -1,0 +1,52 @@
+Optimal number of clusters: 3
+
+================================================================================
+CLUSTER PROFILE ANALYSIS
+================================================================================
+
+--- Cluster 0 (5576 employees, 28.9% churn rate) ---
+  satisfaction_level    : 0.58
+  last_evaluation      : 0.65
+  number_project       : 3.3
+  average_monthly_hours: 147
+  time_spend_company   : 3.3
+  Work_accident        : 0.14
+  promotion_last_5years: 0.02
+  salary_low           : 0.50
+  salary_medium        : 0.42
+
+--- Cluster 1 (5027 employees, 33.5% churn rate) ---
+  satisfaction_level    : 0.59
+  last_evaluation      : 0.78
+  number_project       : 4.4
+  average_monthly_hours: 259
+  time_spend_company   : 3.8
+  Work_accident        : 0.13
+  promotion_last_5years: 0.02
+  salary_low           : 0.49
+  salary_medium        : 0.43
+
+--- Cluster 2 (4396 employees, 6.2% churn rate) ---
+  satisfaction_level    : 0.68
+  last_evaluation      : 0.73
+  number_project       : 3.8
+  average_monthly_hours: 204
+  time_spend_company   : 3.4
+  Work_accident        : 0.17
+
+================================================================================
+SUMMARY COMPARISON (mean values per cluster)
+================================================================================
+         satisfaction_level  last_evaluation  number_project  average_monthly_hours  time_spend_company  Work_accident  promotion_last_5years      left  salary_low  salary_medium
+Cluster
+0                  0.582494         0.648644        3.267755             146.969692            3.312231       0.135043               0.020624  0.289455    0.499821       0.422166
+1                  0.590410         0.779439        4.380147             258.745176            3.771832       0.131888               0.019296  0.335190    0.492341       0.432266
+2                  0.676956         0.729238        3.822111             203.671292            3.421292       0.171292               0.024340  0.061874    0.467243       0.436533
+
+
+================================================================================
+CLUSTER INTERPRETATION
+================================================================================
+  Cluster 0: low hours, few projects, low evaluation
+  Cluster 1: overworked, many projects, high evaluation
+  Cluster 2: low churn risk
