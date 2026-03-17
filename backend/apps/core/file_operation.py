@@ -1,7 +1,7 @@
 import pickle
 import os
 import shutil
-from apps.core.logger import Logger
+from apps.core.logger import logging
 
 class FileOperation:
     """
@@ -27,7 +27,7 @@ class FileOperation:
     def __init__(self,run_id,data_path,mode):
         self.run_id = run_id
         self.data_path = data_path
-        self.logger = Logger(self.run_id, 'FileOperation', mode)
+        self.logger = logging.getLogger('FileOperation')
 
     def save_model(self,model,file_name):
         """

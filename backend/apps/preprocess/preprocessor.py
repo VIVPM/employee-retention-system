@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import json
 from sklearn.impute import KNNImputer
-from apps.core.logger import Logger
+from apps.core.logger import logging
 
 class Preprocessor:
     """
@@ -28,7 +28,7 @@ class Preprocessor:
     def __init__(self,run_id,data_path,mode):
         self.run_id = run_id
         self.data_path = data_path
-        self.logger = Logger(self.run_id, 'Preprocessor', mode)
+        self.logger = logging.getLogger('Preprocessor')
 
     def get_data(self):
         """

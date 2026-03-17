@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 # import flask_monitoringdashboard as dashboard
 import pandas as pd
-from apps.core.logger import Logger
+from apps.core.logger import logging, log_queue
 from apps.training.train_model import TrainModel
 from apps.prediction.predict_model import PredictModel
 from apps.core.config import Config
@@ -49,9 +49,9 @@ def run_training_thread(run_id, data_path):
     try:
         trainModel = TrainModel(run_id, data_path)
         trainModel.training_model()
-        Logger.log_queue.put("TRAINING_COMPLETE")
+        log_queue.put("TRAINING_COMPLETE")
     except Exception as e:
-        Logger.log_queue.put(f"TRAINING_FAILED: {str(e)}")
+        log_queue.put(f"TRAINING_FAILED: {str(e)}")
     finally:
         training_state['is_running'] = False
 
@@ -64,13 +64,14 @@ async def training_route_client(file: UploadFile = File(...)):
     global training_state
     try:
         # Clear the queue from any previous runs
-        while not Logger.log_queue.empty():
-            Logger.log_queue.get_nowait()
+        while not log_queue.empty():
+            log_queue.get_nowait()
 
         config = Config()
         run_id = config.get_run_id()
         data_path = config.training_data_path
-        log_file = f'logs/training_logs/train_log_{run_id}.log'
+        from apps.core.logger import log_file_path
+        log_file = log_file_path
 
         # Store state for frontend reconnect
         training_state['run_id'] = run_id
@@ -127,7 +128,7 @@ def training_stream():
         while True:
             # Check the queue for new logs with a small timeout
             try:
-                message = Logger.log_queue.get(timeout=1.0)
+                message = log_queue.get(timeout=1.0)
                 # Yield the message in SSE format
                 yield f"data: {message}\n\n"
                 
@@ -293,7 +294,7 @@ def list_models():
     from apps.core.hf_uploader import HFUploader
     import os, pandas as pd
     try:
-        uploader = HFUploader(logger=Logger("system", "Main", "api"))
+        uploader = HFUploader(logger=logging.getLogger('HFUploader'))
         versions = uploader.list_models_versions()
         
         # Try to resolve metrics for the latest version from Hub instead of just local
@@ -327,7 +328,7 @@ def load_model(version: str):
     from apps.core.hf_uploader import HFUploader
     import os, pandas as pd
     try:
-        uploader = HFUploader(logger=Logger("system", "Main", "api"))
+        uploader = HFUploader(logger=logging.getLogger('HFUploader'))
         
         # version will be a tag name like 'v1.0'
         snapshot_path = uploader.get_model_snapshot(tag_name=version)
@@ -353,6 +354,121 @@ def load_model(version: str):
             return JSONResponse({"message": f"Successfully loaded version {version} from Hugging Face Hub", "evaluation": metrics})
         else:
             return JSONResponse({"error": "Failed to resolve model snapshot from Hub"}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.get('/cluster_analysis')
+def cluster_analysis():
+    """Returns cluster profile analysis from the currently loaded model's training data"""
+    from fastapi.responses import JSONResponse
+    import numpy as np
+    from sklearn.cluster import KMeans
+    from sklearn.impute import KNNImputer
+    from kneed import KneeLocator
+
+    try:
+        # Load and preprocess data (same steps as training pipeline)
+        csv_path = 'hr_employee_churn_data.csv'
+        if not os.path.exists(csv_path):
+            csv_path = '../hr_employee_churn_data.csv'
+        if not os.path.exists(csv_path):
+            return JSONResponse({"error": "Dataset not found"}, status_code=404)
+
+        df = pd.read_csv(csv_path)
+        df.drop('empid', axis=1, inplace=True)
+
+        # one-hot encode salary
+        cat_df = pd.get_dummies(df['salary'], prefix='salary', drop_first=True).astype(int)
+        df = pd.concat([df, cat_df], axis=1)
+        df.drop('salary', axis=1, inplace=True)
+
+        # handle missing values
+        if df.isnull().sum().any():
+            imputer = KNNImputer(n_neighbors=3, weights='uniform')
+            cols = df.columns
+            df = pd.DataFrame(imputer.fit_transform(df), columns=cols)
+
+        X = df.drop('left', axis=1)
+
+        # find optimal clusters
+        wcss = []
+        for i in range(1, 11):
+            km = KMeans(n_clusters=i, init='k-means++', random_state=0)
+            km.fit(X)
+            wcss.append(km.inertia_)
+
+        kn = KneeLocator(range(1, 11), wcss, curve='convex', direction='decreasing')
+        n_clusters = kn.knee
+
+        # create clusters
+        kmeans = KMeans(n_clusters=n_clusters, init='k-means++', random_state=0)
+        df['Cluster'] = kmeans.fit_predict(X)
+
+        overall_mean = df.drop('Cluster', axis=1).mean()
+
+        clusters = []
+        for c in sorted(df['Cluster'].unique()):
+            cluster_data = df[df['Cluster'] == c]
+            total = len(cluster_data)
+            left_count = int(cluster_data['left'].sum())
+            churn_pct = round((left_count / total) * 100, 1)
+            avg = cluster_data.mean()
+
+            # auto-generate traits
+            traits = []
+            if avg['satisfaction_level'] < overall_mean['satisfaction_level'] - 0.1:
+                traits.append("Low Satisfaction")
+            elif avg['satisfaction_level'] > overall_mean['satisfaction_level'] + 0.1:
+                traits.append("High Satisfaction")
+
+            if avg['average_monthly_hours'] > overall_mean['average_monthly_hours'] + 20:
+                traits.append("Overworked")
+            elif avg['average_monthly_hours'] < overall_mean['average_monthly_hours'] - 20:
+                traits.append("Low Hours")
+
+            if avg['number_project'] > overall_mean['number_project'] + 0.5:
+                traits.append("Many Projects")
+            elif avg['number_project'] < overall_mean['number_project'] - 0.5:
+                traits.append("Few Projects")
+
+            if avg['last_evaluation'] > overall_mean['last_evaluation'] + 0.05:
+                traits.append("High Evaluation")
+            elif avg['last_evaluation'] < overall_mean['last_evaluation'] - 0.05:
+                traits.append("Low Evaluation")
+
+            if avg['time_spend_company'] > overall_mean['time_spend_company'] + 0.5:
+                traits.append("Long Tenure")
+            elif avg['time_spend_company'] < overall_mean['time_spend_company'] - 0.5:
+                traits.append("Short Tenure")
+
+            if churn_pct > 40:
+                traits.append("HIGH CHURN RISK")
+            elif churn_pct < 15:
+                traits.append("Low Churn Risk")
+
+            profile = {
+                'cluster': int(c),
+                'total_employees': total,
+                'churn_rate': churn_pct,
+                'traits': traits if traits else ["Average Profile"],
+                'metrics': {
+                    'satisfaction_level': round(float(avg['satisfaction_level']), 2),
+                    'last_evaluation': round(float(avg['last_evaluation']), 2),
+                    'number_project': round(float(avg['number_project']), 1),
+                    'average_monthly_hours': round(float(avg['average_monthly_hours'])),
+                    'time_spend_company': round(float(avg['time_spend_company']), 1),
+                    'Work_accident': round(float(avg['Work_accident']), 2),
+                    'promotion_last_5years': round(float(avg['promotion_last_5years']), 2),
+                }
+            }
+            clusters.append(profile)
+
+        return JSONResponse({
+            'n_clusters': n_clusters,
+            'total_employees': len(df),
+            'clusters': clusters
+        })
+
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 

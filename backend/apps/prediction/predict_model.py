@@ -1,5 +1,5 @@
 import pandas as pd
-from apps.core.logger import Logger
+from apps.core.logger import logging
 from apps.ingestion.load_validate import LoadValidate
 from apps.preprocess.preprocessor import Preprocessor
 from apps.core.file_operation import FileOperation
@@ -30,7 +30,7 @@ class PredictModel:
         self.run_id = run_id
         self.data_path = data_path
         self.base_path = base_path
-        self.logger = Logger(self.run_id, 'PredictModel', 'prediction')
+        self.logger = logging.getLogger('PredictModel')
         self.loadValidate = LoadValidate(self.run_id, self.data_path,'prediction')
         self.preProcess = Preprocessor(self.run_id, self.data_path,'prediction')
         self.fileOperation = FileOperation(self.run_id, self.data_path, 'prediction')

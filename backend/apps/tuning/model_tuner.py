@@ -4,7 +4,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.metrics  import roc_auc_score,accuracy_score
-from apps.core.logger import Logger
+from apps.core.logger import logging
 
 class ModelTuner:
     """
@@ -29,7 +29,7 @@ class ModelTuner:
     def __init__(self,run_id,data_path,mode):
         self.run_id = run_id
         self.data_path = data_path
-        self.logger = Logger(self.run_id, 'ModelTuner', mode)
+        self.logger = logging.getLogger('ModelTuner')
         self.rfc = RandomForestClassifier()
         self.dt = DecisionTreeClassifier()
         self.lr = LogisticRegression()

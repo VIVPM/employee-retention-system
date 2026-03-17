@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime
 import os
 from apps.database.database_operation import DatabaseOperation
-from apps.core.logger import Logger
+from apps.core.logger import logging
 
 
 class LoadValidate:
@@ -32,7 +32,7 @@ class LoadValidate:
     def __init__(self,run_id,data_path,mode):
         self.run_id = run_id
         self.data_path = data_path
-        self.logger = Logger(self.run_id, 'LoadValidate', mode)
+        self.logger = logging.getLogger('LoadValidate')
         self.dbOperation = DatabaseOperation(self.run_id, self.data_path, mode)
 
     def values_from_schema(self,schema_file):

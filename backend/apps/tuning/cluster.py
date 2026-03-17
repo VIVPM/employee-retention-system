@@ -1,4 +1,4 @@
-from apps.core.logger import Logger
+from apps.core.logger import logging
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from kneed import KneeLocator
@@ -32,7 +32,7 @@ class KMeansCluster:
     def __init__(self,run_id,data_path):
         self.run_id = run_id
         self.data_path = data_path
-        self.logger = Logger(self.run_id, 'KMeansCluster', 'training')
+        self.logger = logging.getLogger('KMeansCluster')
         self.fileOperation = FileOperation(self.run_id, self.data_path, 'training')
 
     def elbow_plot(self,data):

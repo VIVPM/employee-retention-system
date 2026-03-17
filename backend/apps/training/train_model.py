@@ -1,4 +1,4 @@
-from apps.core.logger import Logger
+from apps.core.logger import logging
 import  json
 from sklearn.model_selection import train_test_split
 from apps.core.file_operation import FileOperation
@@ -32,7 +32,7 @@ class TrainModel:
     def __init__(self,run_id,data_path):
         self.run_id = run_id
         self.data_path = data_path
-        self.logger = Logger(self.run_id, 'TrainModel', 'training')
+        self.logger = logging.getLogger('TrainModel')
         self.loadValidate = LoadValidate(self.run_id, self.data_path,'training')
         self.preProcess = Preprocessor(self.run_id, self.data_path,'training')
         self.modelTuner = ModelTuner(self.run_id, self.data_path, 'training')

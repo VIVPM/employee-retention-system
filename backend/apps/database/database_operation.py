@@ -4,7 +4,7 @@ from os import listdir
 import shutil
 import os
 
-from apps.core.logger import Logger
+from apps.core.logger import logging
 
 class DatabaseOperation:
     """
@@ -30,7 +30,7 @@ class DatabaseOperation:
     def __init__(self,run_id,data_path,mode):
         self.run_id = run_id
         self.data_path = data_path
-        self.logger = Logger(self.run_id, 'DatabaseOperation', mode)
+        self.logger = logging.getLogger('DatabaseOperation')
 
     def database_connection(self,database_name):
         """

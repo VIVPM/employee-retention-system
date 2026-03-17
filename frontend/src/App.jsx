@@ -20,6 +20,10 @@ function App() {
   const [batchFile, setBatchFile] = useState(null)
   const [batchResults, setBatchResults] = useState(null)
   const [resultBlob, setResultBlob] = useState(null)
+
+  // Cluster Analysis State
+  const [clusterData, setClusterData] = useState(null)
+  const [loadingClusters, setLoadingClusters] = useState(false)
   
   const [trainingLogs, setTrainingLogs] = useState([])
   const [isTraining, setIsTraining] = useState(false)
@@ -302,6 +306,21 @@ function App() {
     }
   }
 
+  const fetchClusterAnalysis = async () => {
+    setLoadingClusters(true)
+    setClusterData(null)
+    try {
+      const res = await fetch(`${API_URL}/cluster_analysis`)
+      if (!res.ok) throw new Error('Failed to fetch cluster analysis')
+      const data = await res.json()
+      setClusterData(data)
+    } catch (e) {
+      setError(e.message || 'Failed to load cluster analysis')
+    } finally {
+      setLoadingClusters(false)
+    }
+  }
+
   const handleReconnect = async () => {
     try {
       const logsRes = await fetch(`${API_URL}/training_logs`)
@@ -418,11 +437,17 @@ function App() {
           >
             Prediction
           </button>
-          <button 
+          <button
             className={`nav-btn ${activeTab === 'batch_prediction' ? 'active' : ''}`}
             onClick={() => setActiveTab('batch_prediction')}
           >
             Batch Prediction
+          </button>
+          <button
+            className={`nav-btn ${activeTab === 'cluster_analysis' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('cluster_analysis'); if (!clusterData) fetchClusterAnalysis(); }}
+          >
+            Cluster Insights
           </button>
         </div>
 
@@ -565,6 +590,77 @@ function App() {
                     </table>
                   </div>
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'cluster_analysis' && (
+            <div className="cluster-view">
+              <h3>Cluster Insights</h3>
+              <p className="subtitle">Understand the behavioral segments K-Means discovered in your workforce.</p>
+
+              {loadingClusters && <div className="alert alert-loading">Analyzing clusters...</div>}
+
+              {clusterData && (
+                <>
+                  <div style={{ marginBottom: '20px', fontSize: '0.95rem', color: '#aaa' }}>
+                    Optimal clusters found: <strong style={{ color: 'var(--primary-color)' }}>{clusterData.n_clusters}</strong> | Total employees: <strong>{clusterData.total_employees}</strong>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+                    {clusterData.clusters.map(c => (
+                      <div key={c.cluster} style={{
+                        backgroundColor: 'var(--bg-color)',
+                        border: `1px solid ${c.churn_rate > 40 ? '#ef4444' : c.churn_rate < 15 ? '#22c55e' : 'var(--border-color)'}`,
+                        borderRadius: '12px',
+                        padding: '20px',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <h4 style={{ margin: 0, color: 'var(--primary-color)' }}>Cluster {c.cluster}</h4>
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.8rem',
+                            fontWeight: 'bold',
+                            backgroundColor: c.churn_rate > 40 ? 'rgba(239,68,68,0.15)' : c.churn_rate < 15 ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)',
+                            color: c.churn_rate > 40 ? '#ef4444' : c.churn_rate < 15 ? '#22c55e' : '#eab308',
+                          }}>
+                            {c.churn_rate}% churn
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+                          {c.traits.map((t, i) => (
+                            <span key={i} style={{
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              backgroundColor: t === 'HIGH CHURN RISK' ? 'rgba(239,68,68,0.2)' : 'rgba(59,130,246,0.15)',
+                              color: t === 'HIGH CHURN RISK' ? '#ef4444' : '#60a5fa',
+                            }}>
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+
+                        <div style={{ fontSize: '0.85rem', color: '#ccc', lineHeight: '1.8' }}>
+                          <div><strong>{c.total_employees}</strong> employees</div>
+                          <div>Satisfaction: <strong>{c.metrics.satisfaction_level}</strong></div>
+                          <div>Evaluation: <strong>{c.metrics.last_evaluation}</strong></div>
+                          <div>Projects: <strong>{c.metrics.number_project}</strong></div>
+                          <div>Avg Hours: <strong>{c.metrics.average_monthly_hours}</strong></div>
+                          <div>Tenure: <strong>{c.metrics.time_spend_company} yrs</strong></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                    <button className="submit-btn" onClick={fetchClusterAnalysis} disabled={loadingClusters} style={{ padding: '8px 20px' }}>
+                      {loadingClusters ? <span className="loader" style={{width: '16px', height: '16px'}}></span> : 'Refresh Analysis'}
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           )}
