@@ -40,20 +40,31 @@ graph LR
 The model was evaluated using a 20% hold-out test set. The `RandomForestClassifier` emerged as the best performing model.
 
 - **Best Model:** Random Forest Classifier
-- **Parameters:** `max_depth=3`, `n_estimators=130`, `criterion='entropy'`
-- **Accuracy Score:** **91.43%** (on test set)
+- **Parameters:** `max_depth=3`, `n_estimators=100`, `criterion='entropy'`, `max_features = 'sqrt'`,`class_weight='balanced'`
+- **Accuracy Score:** **94.63%** (on test set)
 - **Evaluation Method:** Stratified Train-Test Split (80/20)
+- **Class Imbalance Handling:** `class_weight='balanced'` applied across all models to address the ~76/24 class distribution
 
-### 📊 Model Comparison (Grid Search Results)
+### Model Comparison (Grid Search Results)
 
-During the model selection phase, several algorithms were evaluated using 5-fold Cross-Validation:
+During the model selection phase, several algorithms were evaluated using 5-fold Cross-Validation on the **training set only** (no data leakage):
 
-| Model | Best CV Score | Notes |
-| :--- | :--- | :--- |
-| **Random Forest** | **91.73%** | Robust performance, selected for final deployment. |
-| **Decision Tree** | 88.77% | Good baseline but prone to higher variance. |
-| **Logistic Regression** | 76.65% | Limited by linear decision boundaries. |
-| **Linear SVC** | 75.04% | Similar performance to Logistic Regression. |
+| Model                   | Best CV Score | Notes                                              |
+| :---------------------- | :------------ | :------------------------------------------------- |
+| **Random Forest**       | **95.10%**    | Robust performance, selected for final deployment. |
+| **Decision Tree**       | 85.27%        | Good baseline but prone to higher variance.        |
+| **Logistic Regression** | 75.85%        | Limited by linear decision boundaries.             |
+| **Linear SVC**          | 75.13%        | Similar performance to Logistic Regression.        |
+
+### Classification Report (Test Set)
+
+| Class       | Precision | Recall | F1-Score | Support |
+| :---------- | :-------- | :----- | :------- | :------ |
+| 0 (Stayed)  | 0.98      | 0.96   | 0.97     | 2286    |
+| 1 (Left)    | 0.88      | 0.93   | 0.91     | 714     |
+| **Accuracy** |          |        | **0.95** | 3000    |
+
+> Recall on the "Left" class (0.93) is prioritized — missing an at-risk employee is costlier than a false alarm.
 
 ## Project Structure
 
@@ -78,13 +89,14 @@ employee-retention-system/
 - **Frontend:** React (Vite), Modern CSS (Premium UI)
 - **Backend:** FastAPI, Uvicorn
 - **Machine Learning:** Scikit-learn, Pandas, NumPy, Matplotlib, Seaborn
-- **Model:** Random Forest Classifier
+- **Model:** Random Forest Classifier (`class_weight='balanced'` for handling class imbalance)
 
 ---
 
 ## How to Run
 
 ### 1. Backend (FastAPI)
+
 ```bash
 cd backend
 pip install -r requirements.txt
@@ -92,12 +104,14 @@ python main.py
 ```
 
 ### 2. Frontend (React)
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-*   **Session Persistence**: Training logs and states are cached securely, so you can safely refresh the page without losing your live training progress.
+
+- **Session Persistence**: Training logs and states are cached securely, so you can safely refresh the page without losing your live training progress.
 
 ---
 

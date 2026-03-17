@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://employee-retention-system.onrender.com' || 'http://localhost:8000'
+
 function App() {
   const [activeTab, setActiveTab] = useState('prediction')
   
@@ -34,7 +36,7 @@ function App() {
   const fetchModels = async (justTrained = false) => {
     setLoadingModels(true)
     try {
-      const res = await fetch('http://localhost:8000/models')
+      const res = await fetch(`${API_URL}/models`)
       const data = await res.json()
       const versions = data.models || []
       setModelVersions(versions)
@@ -59,7 +61,7 @@ function App() {
     if (!selectedVersion) return
     setLoadingSpecificModel(true)
     try {
-      const res = await fetch(`http://localhost:8000/models/load/${selectedVersion}`, { method: 'POST' })
+      const res = await fetch(`${API_URL}/models/load/${selectedVersion}`, { method: 'POST' })
       if (!res.ok) throw new Error('Failed to download model from Hugging Face')
       setLoadedVersion(selectedVersion)
       alert(`✅ Successfully loaded ${selectedVersion} for predictions!`)
@@ -74,11 +76,11 @@ function App() {
   useEffect(() => {
     const checkAndRestoreLogs = async () => {
       try {
-        const statusRes = await fetch('http://localhost:8000/training_status')
+        const statusRes = await fetch(`${API_URL}/training_status`)
         const status = await statusRes.json()
 
         if (status.has_logs) {
-          const logsRes = await fetch('http://localhost:8000/training_logs')
+          const logsRes = await fetch(`${API_URL}/training_logs`)
           const data = await logsRes.json()
           if (data.logs && data.logs.length > 0) {
             setTrainingLogs(data.logs)
@@ -100,7 +102,7 @@ function App() {
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
     }
-    const eventSource = new EventSource('http://localhost:8000/training_stream')
+    const eventSource = new EventSource(`${API_URL}/training_stream`)
     eventSourceRef.current = eventSource
 
     eventSource.onmessage = (event) => {
@@ -163,7 +165,7 @@ function App() {
         formBody.append(key, formData[key])
       }
 
-      const response = await fetch('http://localhost:8000/prediction', {
+      const response = await fetch(`${API_URL}/prediction`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -211,7 +213,7 @@ function App() {
       const formData = new FormData()
       formData.append('file', batchFile)
 
-      const response = await fetch('http://localhost:8000/batch_predict_file', {
+      const response = await fetch(`${API_URL}/batch_predict_file`, {
         method: 'POST',
         body: formData
       })
@@ -271,7 +273,7 @@ function App() {
       const form = new FormData()
       form.append('file', trainingFile)
 
-      const response = await fetch('http://localhost:8000/training', {
+      const response = await fetch(`${API_URL}/training`, {
         method: 'POST',
         body: form
       })
@@ -302,7 +304,7 @@ function App() {
 
   const handleReconnect = async () => {
     try {
-      const logsRes = await fetch('http://localhost:8000/training_logs')
+      const logsRes = await fetch(`${API_URL}/training_logs`)
       const data = await logsRes.json()
       if (data.logs && data.logs.length > 0) {
         setTrainingLogs(data.logs)

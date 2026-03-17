@@ -82,7 +82,11 @@ class TrainModel:
                 cluster_label= cluster_data['Labels']
 
                 # splitting the data into training and test set for each cluster one by one
-                x_train, x_test, y_train, y_test = train_test_split(cluster_features, cluster_label, test_size=0.2, random_state=0)
+                try:
+                    x_train, x_test, y_train, y_test = train_test_split(cluster_features, cluster_label, test_size=0.2, random_state=0, stratify=cluster_label)
+                except ValueError:
+                    self.logger.info('Stratified split failed for cluster %s (too few samples in a class), falling back to regular split' % str(i))
+                    x_train, x_test, y_train, y_test = train_test_split(cluster_features, cluster_label, test_size=0.2, random_state=0)
                 #getting the best model for each of the clusters
                 best_model_name, best_model, all_results = self.modelTuner.get_best_model(x_train, y_train, x_test, y_test)
 

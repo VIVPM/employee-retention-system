@@ -60,7 +60,8 @@ class ModelTuner:
 
             #creating a new model with the best parameters
             self.rfc = RandomForestClassifier(n_estimators=self.n_estimators, criterion=self.criterion,
-                                              max_depth=self.max_depth, max_features=self.max_features)
+                                              max_depth=self.max_depth, max_features=self.max_features,
+                                              class_weight='balanced')
             # training the new model
             self.rfc.fit(train_x, train_y)
             self.rf_best_params = {'criterion': self.criterion, 'max_depth': self.max_depth, 'max_features': self.max_features, 'n_estimators': self.n_estimators}
@@ -81,7 +82,7 @@ class ModelTuner:
                 'max_depth': range(2, 4, 1),
                 'max_features': ['sqrt', 'log2']
             }
-            self.grid = GridSearchCV(DecisionTreeClassifier(), self.param_grid_dt, cv=5, scoring='roc_auc')
+            self.grid = GridSearchCV(DecisionTreeClassifier(class_weight='balanced'), self.param_grid_dt, cv=5, scoring='roc_auc')
             self.grid.fit(train_x, train_y)
 
             self.criterion = self.grid.best_params_['criterion']
@@ -90,7 +91,8 @@ class ModelTuner:
             self.max_features = self.grid.best_params_['max_features']
 
             self.dt = DecisionTreeClassifier(criterion=self.criterion, splitter=self.splitter,
-                                             max_depth=self.max_depth, max_features=self.max_features)
+                                             max_depth=self.max_depth, max_features=self.max_features,
+                                             class_weight='balanced')
             self.dt.fit(train_x, train_y)
             self.dt_best_params = self.grid.best_params_
             self.logger.info('Decision Tree best params: ' + str(self.grid.best_params_))
@@ -107,14 +109,14 @@ class ModelTuner:
                 'penalty': ['l2'],
                 'solver': ['lbfgs', 'liblinear']
             }
-            self.grid = GridSearchCV(LogisticRegression(), self.param_grid_lr, cv=5, scoring='roc_auc')
+            self.grid = GridSearchCV(LogisticRegression(class_weight='balanced'), self.param_grid_lr, cv=5, scoring='roc_auc')
             self.grid.fit(train_x, train_y)
 
             self.C = self.grid.best_params_['C']
             self.penalty = self.grid.best_params_['penalty']
             self.solver = self.grid.best_params_['solver']
 
-            self.lr = LogisticRegression(C=self.C, penalty=self.penalty, solver=self.solver)
+            self.lr = LogisticRegression(C=self.C, penalty=self.penalty, solver=self.solver, class_weight='balanced')
             self.lr.fit(train_x, train_y)
             self.lr_best_params = self.grid.best_params_
             self.logger.info('Logistic Regression best params: ' + str(self.grid.best_params_))
@@ -131,14 +133,14 @@ class ModelTuner:
                 'kernel': ['linear'],
                 'gamma': ['scale', 'auto']
             }
-            self.grid = GridSearchCV(SVC(probability=True), self.param_grid_svm, cv=5, scoring='roc_auc')
+            self.grid = GridSearchCV(SVC(probability=True, class_weight='balanced'), self.param_grid_svm, cv=5, scoring='roc_auc')
             self.grid.fit(train_x, train_y)
 
             self.C = self.grid.best_params_['C']
             self.kernel = self.grid.best_params_['kernel']
             self.gamma = self.grid.best_params_['gamma']
 
-            self.sv = SVC(C=self.C, kernel=self.kernel, gamma=self.gamma, probability=True)
+            self.sv = SVC(C=self.C, kernel=self.kernel, gamma=self.gamma, probability=True, class_weight='balanced')
             self.sv.fit(train_x, train_y)
             self.sv_best_params = self.grid.best_params_
             self.logger.info('SVM best params: ' + str(self.grid.best_params_))
