@@ -3,7 +3,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
-from sklearn.metrics  import roc_auc_score,accuracy_score
+from sklearn.metrics  import roc_auc_score,accuracy_score,recall_score
 from apps.core.logger import logging
 
 class ModelTuner:
@@ -36,38 +36,27 @@ class ModelTuner:
         self.sv = SVC(probability=True)
 
     def best_params_randomforest(self,train_x,train_y):
-        """
-        * method: best_params_randomforest
-        * description: method to get the parameters for Random Forest Algorithm which give the best accuracy.
-                                             Parameters are fixed to optimize training speed.
-        * return: The model with the best parameters
-        *
-        * who             when           version  change (include bug# if apply)
-        * ----------      -----------    -------  ------------------------------
-        * VIVEK           11-MAR-2026    1.1      fixed parameters for speed
-        *
-        * Parameters
-        *   train_x:
-        *   train_y:
-        """
         try:
-            self.logger.info('Start of building randomforest with fixed params...')
-            # Using fixed parameters provided by user for optimization
-            self.criterion = 'gini'
-            self.max_depth = 3
-            self.max_features = 'sqrt'
-            self.n_estimators = 10
+            self.logger.info('Start of finding best params for Random Forest algo...')
+            self.param_grid_rf = {
+                'n_estimators': [10, 50, 100],
+                'criterion': ['gini', 'entropy'],
+                'max_depth': range(2, 4, 1),
+                'max_features': ['sqrt', 'log2']
+            }
+            self.grid = GridSearchCV(RandomForestClassifier(class_weight='balanced'), self.param_grid_rf, cv=5, scoring='recall')
+            self.grid.fit(train_x, train_y)
 
-            #creating a new model with the best parameters
-            self.rfc = RandomForestClassifier(n_estimators=self.n_estimators, criterion=self.criterion,
-                                              max_depth=self.max_depth, max_features=self.max_features,
-                                              class_weight='balanced')
-            # training the new model
+            self.rfc = RandomForestClassifier(
+                n_estimators=self.grid.best_params_['n_estimators'],
+                criterion=self.grid.best_params_['criterion'],
+                max_depth=self.grid.best_params_['max_depth'],
+                max_features=self.grid.best_params_['max_features'],
+                class_weight='balanced'
+            )
             self.rfc.fit(train_x, train_y)
-            self.rf_best_params = {'criterion': self.criterion, 'max_depth': self.max_depth, 'max_features': self.max_features, 'n_estimators': self.n_estimators}
-            self.logger.info('Random Forest used fixed params: ' + str(self.rf_best_params))
-            self.logger.info('End of building randomforest with fixed params...')
-
+            self.rf_best_params = self.grid.best_params_
+            self.logger.info('Random Forest best params: ' + str(self.grid.best_params_))
             return self.rfc
         except Exception as e:
             self.logger.exception('Exception raised while building randomforest:' + str(e))
@@ -82,7 +71,7 @@ class ModelTuner:
                 'max_depth': range(2, 4, 1),
                 'max_features': ['sqrt', 'log2']
             }
-            self.grid = GridSearchCV(DecisionTreeClassifier(class_weight='balanced'), self.param_grid_dt, cv=5, scoring='roc_auc')
+            self.grid = GridSearchCV(DecisionTreeClassifier(class_weight='balanced'), self.param_grid_dt, cv=5, scoring='recall')
             self.grid.fit(train_x, train_y)
 
             self.criterion = self.grid.best_params_['criterion']
@@ -109,7 +98,7 @@ class ModelTuner:
                 'penalty': ['l2'],
                 'solver': ['lbfgs', 'liblinear']
             }
-            self.grid = GridSearchCV(LogisticRegression(class_weight='balanced'), self.param_grid_lr, cv=5, scoring='roc_auc')
+            self.grid = GridSearchCV(LogisticRegression(class_weight='balanced'), self.param_grid_lr, cv=5, scoring='recall')
             self.grid.fit(train_x, train_y)
 
             self.C = self.grid.best_params_['C']
@@ -133,7 +122,7 @@ class ModelTuner:
                 'kernel': ['linear'],
                 'gamma': ['scale', 'auto']
             }
-            self.grid = GridSearchCV(SVC(probability=True, class_weight='balanced'), self.param_grid_svm, cv=5, scoring='roc_auc')
+            self.grid = GridSearchCV(SVC(probability=True, class_weight='balanced'), self.param_grid_svm, cv=5, scoring='recall')
             self.grid.fit(train_x, train_y)
 
             self.C = self.grid.best_params_['C']
@@ -151,37 +140,48 @@ class ModelTuner:
 
 
     def get_best_model(self,train_x,train_y,test_x,test_y):
-        """
-        * method: get_best_model
-        * description: method to get best model (Optimized: Random Forest only)
-        * return: none
-        *
-        * who             when           version  change (include bug# if apply)
-        * ----------      -----------    -------  ------------------------------
-        * VIVEK           11-MAR-2026    1.1      optimized for speed (RF only)
-        *
-        * Parameters
-        *   train_x:
-        *   train_y:
-        *   test_x:
-        *   test_y:
-        """
         try:
-            self.logger.info('Start of finding best model (Optimized)...')
+            self.logger.info('Start of finding best model using Recall...')
 
-            # We bypass searching and directly use the expert parameters for Random Forest
+            # Train all 4 models with GridSearchCV (scoring=recall)
             self.random_forest = self.best_params_randomforest(train_x, train_y)
-            self.rf_score = roc_auc_score(test_y, self.random_forest.predict_proba(test_x)[:, 1])
-            self.logger.info('AUC for Random Forest: ' + str(self.rf_score))
+            self.rf_recall = recall_score(test_y, self.random_forest.predict(test_x))
+            self.rf_auc = roc_auc_score(test_y, self.random_forest.predict_proba(test_x)[:, 1])
+            self.logger.info('Random Forest - Recall: ' + str(self.rf_recall) + ' | AUC: ' + str(self.rf_auc))
 
-            self.logger.info('End of model selection (Optimization enabled: RF only).')
-            
-            best_model_name = 'RandomForest'
+            self.decision_tree = self.best_params_decisiontree(train_x, train_y)
+            self.dt_recall = recall_score(test_y, self.decision_tree.predict(test_x))
+            self.dt_auc = roc_auc_score(test_y, self.decision_tree.predict_proba(test_x)[:, 1])
+            self.logger.info('Decision Tree - Recall: ' + str(self.dt_recall) + ' | AUC: ' + str(self.dt_auc))
+
+            self.logistic_reg = self.best_params_logistic_regression(train_x, train_y)
+            self.lr_recall = recall_score(test_y, self.logistic_reg.predict(test_x))
+            self.lr_auc = roc_auc_score(test_y, self.logistic_reg.predict_proba(test_x)[:, 1])
+            self.logger.info('Logistic Regression - Recall: ' + str(self.lr_recall) + ' | AUC: ' + str(self.lr_auc))
+
+            self.svm = self.best_params_svm(train_x, train_y)
+            self.svm_recall = recall_score(test_y, self.svm.predict(test_x))
+            self.svm_auc = roc_auc_score(test_y, self.svm.predict_proba(test_x)[:, 1])
+            self.logger.info('SVM - Recall: ' + str(self.svm_recall) + ' | AUC: ' + str(self.svm_auc))
+
+            # Pick best model by recall
+            models = {
+                'RandomForest': (self.random_forest, self.rf_recall, self.rf_auc, self.rf_best_params),
+                'DecisionTree': (self.decision_tree, self.dt_recall, self.dt_auc, self.dt_best_params),
+                'LogisticRegression': (self.logistic_reg, self.lr_recall, self.lr_auc, self.lr_best_params),
+                'SVM': (self.svm, self.svm_recall, self.svm_auc, self.sv_best_params),
+            }
+
+            best_model_name = max(models, key=lambda k: models[k][1])
+            best_model = models[best_model_name][0]
+            self.logger.info('Best model selected: ' + best_model_name + ' with Recall: ' + str(models[best_model_name][1]))
+
             all_results = [
-                {'model_name': 'RandomForest', 'score': self.rf_score, 'params': self.rf_best_params}
+                {'model_name': name, 'score': info[1], 'auc': info[2], 'params': info[3]}
+                for name, info in models.items()
             ]
-            
-            return best_model_name, self.random_forest, all_results
+
+            return best_model_name, best_model, all_results
 
         except Exception as e:
             self.logger.exception('Exception raised while finding best model:' + str(e))

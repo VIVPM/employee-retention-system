@@ -98,7 +98,8 @@ class TrainModel:
                     results_list.append({
                         'Cluster': i,
                         'Model Name': r['model_name'],
-                        'Best Score AUC': r['score'],
+                        'Best Score Recall': r['score'],
+                        'Best Score AUC': r.get('auc', 'N/A'),
                         'Best Parameters': str(r['params']),
                         'Selected': 'Yes' if r['model_name'] == best_model_name else 'No'
                     })

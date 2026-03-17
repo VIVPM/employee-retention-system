@@ -340,9 +340,9 @@ def list_models():
                     try:
                         df = pd.read_csv(res_path)
                         selected = df[df['Selected'] == 'Yes'] if 'Selected' in df.columns else df
-                        best_row = selected.loc[selected['Best Score AUC'].idxmax()]
+                        best_row = selected.loc[selected['Best Score Recall'].idxmax()]
                         versions[0]["metrics"] = {
-                            "accuracy": f"{best_row['Best Score AUC']*100:.2f}%",
+                            "accuracy": f"{best_row['Best Score Recall']*100:.2f}%",
                             "best_model": best_row['Model Name'],
                             "cluster": str(best_row['Cluster'])
                         }
@@ -376,9 +376,9 @@ def load_model(version: str):
                 try:
                     df = pd.read_csv(results_path)
                     selected = df[df['Selected'] == 'Yes'] if 'Selected' in df.columns else df
-                    best_row = selected.loc[selected['Best Score AUC'].idxmax()]
+                    best_row = selected.loc[selected['Best Score Recall'].idxmax()]
                     metrics = {
-                        "accuracy": f"{best_row['Best Score AUC']*100:.2f}%",
+                        "accuracy": f"{best_row['Best Score Recall']*100:.2f}%",
                         "best_model": best_row['Model Name']
                     }
                 except:
