@@ -88,14 +88,24 @@ class HFUploader:
             tags = [tag for tag in refs.tags if tag.name.startswith("v")]
             tags = sorted(tags, key=lambda x: float(x.name.replace("v", "")), reverse=True)
             
+            # Fetch commit info for dates
+            commit_dates = {}
+            try:
+                commits = self.api.list_repo_commits(repo_id=self.repo_id)
+                for c in commits:
+                    commit_dates[c.commit_id] = c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else "N/A"
+            except:
+                pass
+
             versions = []
             for idx, tag in enumerate(tags):
+                commit_id = getattr(tag, 'target_commit', getattr(tag, 'commit', tag.name))
                 versions.append({
-                    "version": tag.name,         
-                    "run_id": getattr(tag, 'target_commit', getattr(tag, 'commit', tag.name)),
+                    "version": tag.name,
+                    "run_id": commit_id,
                     "status": "Active" if idx == 0 else "Archive",
-                    "date": "N/A",               # refs.tags doesn't expose date easily, can be enhanced if needed
-                    "metrics": {}                
+                    "date": commit_dates.get(commit_id, "N/A"),
+                    "metrics": {}
                 })
                 
             return versions
