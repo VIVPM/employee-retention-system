@@ -50,7 +50,10 @@ class FileOperation:
             if not base_path:
                 raise ValueError("base_path must be provided for model loading")
 
+            # Try .joblib first, fall back to .sav for backward compatibility
             model_path = os.path.join(base_path, file_name, file_name + '.joblib')
+            if not os.path.exists(model_path):
+                model_path = os.path.join(base_path, file_name, file_name + '.sav')
             self.logger.info('Loaded: %s' % file_name)
             return joblib.load(model_path)
         except Exception as e:

@@ -155,8 +155,11 @@ class Preprocessor:
 
     def preprocess_predict(self, data):
         try:
-            cat_df = self.feature_encoding(data)
-            data = pd.concat([data, cat_df], axis=1)
+            # Manual encoding for single row (get_dummies drops the only category with drop_first=True)
+            salary_val = data['salary'].iloc[0]
+            data = data.copy()
+            data['salary_low'] = 1 if salary_val == 'low' else 0
+            data['salary_medium'] = 1 if salary_val == 'medium' else 0
             data = self.drop_columns(data, ['salary'])
             is_null_present = self.is_null_present(data)
             if is_null_present:
