@@ -175,18 +175,24 @@ function App() {
     setResult(null)
 
     try {
-      // Build form data representation
-      const formBody = new URLSearchParams()
-      for (const key in formData) {
-        formBody.append(key, formData[key])
+      // Build JSON payload matching Pydantic model
+      const jsonBody = {
+        satisfaction_level: parseFloat(formData.satisfaction_level),
+        last_evaluation: parseFloat(formData.last_evaluation),
+        number_project: parseInt(formData.number_project),
+        average_monthly_hours: parseInt(formData.average_monthly_hours),
+        time_spend_company: parseInt(formData.time_spend_company),
+        work_accident: parseInt(formData.work_accident),
+        promotion_last_5years: parseInt(formData.promotion_last_5years),
+        salary: formData.salary
       }
 
       const response = await fetch(`${API_URL}/prediction`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: formBody.toString()
+        body: JSON.stringify(jsonBody)
       })
 
       if (!response.ok) {
