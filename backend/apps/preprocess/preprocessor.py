@@ -125,7 +125,7 @@ class Preprocessor:
             data = self.drop_columns(data, ['empid'])
             cat_df = self.feature_encoding(data)
             data = pd.concat([data, cat_df], axis=1)
-            data = self.drop_columns(data, ['salary'])
+            data = self.drop_columns(data, ['salary', 'salary_low'])
             is_null_present = self.is_null_present(data)
             if is_null_present:
                 data = self.impute_missing_values(data)
@@ -142,7 +142,7 @@ class Preprocessor:
             data = self.get_data()
             cat_df = self.feature_encoding(data)
             data = pd.concat([data, cat_df], axis=1)
-            data = self.drop_columns(data, ['salary'])
+            data = self.drop_columns(data, ['salary', 'salary_low'])
             is_null_present = self.is_null_present(data)
             if is_null_present:
                 data = self.impute_missing_values(data)
@@ -158,7 +158,6 @@ class Preprocessor:
             # Manual encoding for single row (get_dummies drops the only category with drop_first=True)
             salary_val = data['salary'].iloc[0]
             data = data.copy()
-            data['salary_low'] = 1 if salary_val == 'low' else 0
             data['salary_medium'] = 1 if salary_val == 'medium' else 0
             data = self.drop_columns(data, ['salary'])
             is_null_present = self.is_null_present(data)

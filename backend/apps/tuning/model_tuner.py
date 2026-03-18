@@ -44,7 +44,7 @@ class ModelTuner:
 
             model = RandomForestClassifier(
                 n_estimators=150,
-                criterion='gini',
+                criterion='entropy',
                 max_depth=None,
                 max_features='log2',
                 class_weight='balanced',
@@ -65,7 +65,7 @@ class ModelTuner:
                 'AUC_ROC': round(roc_auc_score(test_y, y_proba), 4),
                 'Parameters': str({
                     'n_estimators': 150,
-                    'criterion': 'gini',
+                    'criterion': 'entropy',
                     'max_depth': None,
                     'max_features': 'log2',
                     'class_weight': 'balanced',
