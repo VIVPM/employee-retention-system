@@ -448,7 +448,7 @@ def load_model(version: str):
 # ============================================================
 @app.get('/logs')
 def get_all_logs():
-    """Returns all log entries sorted by timestamp."""
+    """Returns all log sessions (training/prediction) split from log files, sorted by timestamp."""
     import glob as glob_mod
     log_entries = []
     logs_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
@@ -456,29 +456,58 @@ def get_all_logs():
     if not os.path.isdir(logs_base):
         return JSONResponse({"logs": []})
 
+    # Markers that start a new session
+    session_markers = {
+        'Start of Training': 'training',
+        'Training started': 'training',
+        'Batch prediction started': 'prediction',
+        'Single prediction:': 'prediction',
+    }
+
     for log_file in glob_mod.glob(os.path.join(logs_base, "*.log")):
-        filename = os.path.basename(log_file)
         try:
             with open(log_file, 'r') as f:
                 lines = [line.rstrip('\n') for line in f.readlines() if line.strip()]
             if not lines:
                 continue
-            # Detect type from log content
-            content = '\n'.join(lines)
-            if 'Start of Training' in content or 'TrainModel' in content:
-                log_type = 'training'
-            elif 'Start of Prediction' in content or 'PredictModel' in content:
-                log_type = 'prediction'
-            else:
-                log_type = 'system'
-            # Extract timestamp from first line
-            timestamp = lines[0].split(']')[0].replace('[', '').strip() if lines else ''
-            log_entries.append({
-                "type": log_type,
-                "filename": filename,
-                "timestamp": timestamp,
-                "lines": lines
-            })
+
+            # Split log file into sessions based on markers
+            current_session = []
+            current_type = None
+
+            for line in lines:
+                # Check if this line starts a new session
+                new_type = None
+                for marker, stype in session_markers.items():
+                    if marker in line:
+                        new_type = stype
+                        break
+
+                if new_type:
+                    # Save previous session if exists
+                    if current_session and current_type:
+                        timestamp = current_session[0].split(']')[0].replace('[', '').strip()
+                        log_entries.append({
+                            "type": current_type,
+                            "filename": os.path.basename(log_file),
+                            "timestamp": timestamp,
+                            "lines": current_session
+                        })
+                    # Start new session
+                    current_session = [line]
+                    current_type = new_type
+                elif current_type:
+                    current_session.append(line)
+
+            # Save last session
+            if current_session and current_type:
+                timestamp = current_session[0].split(']')[0].replace('[', '').strip()
+                log_entries.append({
+                    "type": current_type,
+                    "filename": os.path.basename(log_file),
+                    "timestamp": timestamp,
+                    "lines": current_session
+                })
         except Exception:
             continue
 
