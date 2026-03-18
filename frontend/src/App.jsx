@@ -71,6 +71,15 @@ function App() {
 
   useEffect(() => {
     fetchModels()
+    // Fetch active model version from backend
+    fetch(`${API_URL}/health`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.active_version) {
+          setLoadedVersion(data.active_version)
+        }
+      })
+      .catch(() => {})
   }, [])
 
   const handleLoadModel = async () => {
