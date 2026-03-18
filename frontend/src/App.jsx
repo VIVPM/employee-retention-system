@@ -617,7 +617,7 @@ function App() {
           {activeTab === 'logs' && (
             <div className="logs-view">
               <h3>Activity Logs</h3>
-              <p className="subtitle">All training and prediction logs sorted by most recent.</p>
+              <p className="subtitle" style={{ marginBottom: '1.5rem' }}>All training and prediction logs sorted by most recent.</p>
 
               <button
                 className="submit-btn"
