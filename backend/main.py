@@ -448,30 +448,39 @@ def load_model(version: str):
 # ============================================================
 @app.get('/logs')
 def get_all_logs():
-    """Returns all training and prediction log entries sorted by timestamp."""
+    """Returns all log entries sorted by timestamp."""
     import glob as glob_mod
     log_entries = []
     logs_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
 
-    for log_type, folder in [("training", "training_logs"), ("prediction", "prediction_logs")]:
-        folder_path = os.path.join(logs_base, folder)
-        if not os.path.isdir(folder_path):
-            continue
-        for log_file in glob_mod.glob(os.path.join(folder_path, "*.log")):
-            filename = os.path.basename(log_file)
-            try:
-                with open(log_file, 'r') as f:
-                    lines = [line.rstrip('\n') for line in f.readlines() if line.strip()]
-                # Extract timestamp from first line for sorting
-                timestamp = lines[0].split(' : ')[0].strip() if lines else ''
-                log_entries.append({
-                    "type": log_type,
-                    "filename": filename,
-                    "timestamp": timestamp,
-                    "lines": lines
-                })
-            except Exception:
+    if not os.path.isdir(logs_base):
+        return JSONResponse({"logs": []})
+
+    for log_file in glob_mod.glob(os.path.join(logs_base, "*.log")):
+        filename = os.path.basename(log_file)
+        try:
+            with open(log_file, 'r') as f:
+                lines = [line.rstrip('\n') for line in f.readlines() if line.strip()]
+            if not lines:
                 continue
+            # Detect type from log content
+            content = '\n'.join(lines)
+            if 'Start of Training' in content or 'TrainModel' in content:
+                log_type = 'training'
+            elif 'Start of Prediction' in content or 'PredictModel' in content:
+                log_type = 'prediction'
+            else:
+                log_type = 'system'
+            # Extract timestamp from first line
+            timestamp = lines[0].split(']')[0].replace('[', '').strip() if lines else ''
+            log_entries.append({
+                "type": log_type,
+                "filename": filename,
+                "timestamp": timestamp,
+                "lines": lines
+            })
+        except Exception:
+            continue
 
     # Sort by timestamp descending (newest first)
     log_entries.sort(key=lambda x: x['timestamp'], reverse=True)
