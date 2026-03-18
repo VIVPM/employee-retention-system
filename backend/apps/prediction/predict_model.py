@@ -38,41 +38,20 @@ class PredictModel:
         self.fileOperation = FileOperation(self.run_id, self.data_path, 'prediction')
 
     def batch_predict_from_model(self):
-        """
-        * method: batch_predict_from_model
-        * description: method to predict results for batch data
-        * return: none
-        *
-        * who             when           version  change (include bug# if apply)
-        * ----------      -----------    -------  ------------------------------
-        * VIVEK           11-MAR-2026    1.0      initial creation
-        * VIVEK           18-MAR-2026    2.0      removed clustering, added scaler
-        *
-        * Parameters
-        *   none:
-        """
         try:
-            self.logger.info('Start of Prediction')
-            self.logger.info('run_id:' + str(self.run_id))
+            self.logger.info('Batch prediction started (run_id: %s)' % str(self.run_id))
 
-            # Validations and transformation
             self.loadValidate.validate_predictset()
-
-            # Preprocessing activities
             self.X = self.preProcess.preprocess_predictset()
 
             # Load scaler and model
             scaler = self.fileOperation.load_model('scaler', base_path=self.base_path)
             model = self.fileOperation.load_model('best_model', base_path=self.base_path)
 
-            # Store empid before scaling
+            # Scale and predict
             emp_ids = self.X['empid']
             features = self.X.drop(['empid'], axis=1)
-
-            # Scale features
             features_scaled = scaler.transform(features)
-
-            # Predict
             y_predicted = model.predict(features_scaled)
 
             # Save results
@@ -82,46 +61,26 @@ class PredictModel:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             result.to_csv(file_path, header=True, index=False)
 
-            self.logger.info('End of Prediction')
+            self.logger.info('Batch prediction complete: %d predictions' % len(y_predicted))
         except Exception:
-            self.logger.exception('Unsuccessful End of Prediction')
+            self.logger.exception('Batch prediction failed')
             raise Exception
 
     def single_predict_from_model(self, data):
-        """
-        * method: single_predict_from_model
-        * description: method to predict result for single employee
-        * return: prediction (0 or 1)
-        *
-        * who             when           version  change (include bug# if apply)
-        * ----------      -----------    -------  ------------------------------
-        * VIVEK           11-MAR-2026    1.0      initial creation
-        * VIVEK           18-MAR-2026    2.0      removed clustering, added scaler
-        *
-        * Parameters
-        *   data:
-        """
         try:
-            self.logger.info('Start of Prediction')
-            self.logger.info('run_id:' + str(self.run_id))
-
-            # Preprocessing activities
             self.X = self.preProcess.preprocess_predict(data)
 
             # Load scaler and model
             scaler = self.fileOperation.load_model('scaler', base_path=self.base_path)
             model = self.fileOperation.load_model('best_model', base_path=self.base_path)
 
-            # Scale features (drop empid for prediction)
+            # Scale and predict
             features = self.X.drop(['empid'], axis=1)
             features_scaled = scaler.transform(features)
-
-            # Predict
             y_predicted = model.predict(features_scaled)
 
-            self.logger.info('Output : ' + str(y_predicted))
-            self.logger.info('End of Prediction')
+            self.logger.info('Single prediction: %d' % y_predicted[0])
             return int(y_predicted[0])
         except Exception:
-            self.logger.exception('Unsuccessful End of Prediction')
+            self.logger.exception('Single prediction failed')
             raise Exception

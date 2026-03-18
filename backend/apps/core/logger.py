@@ -10,8 +10,8 @@ log_queue = queue.Queue()
 
 # ── App-level logger names (only these get pushed to SSE) ──
 APP_LOGGERS = {
-    'TrainModel', 'ModelTuner', 'KMeansCluster', 'FileOperation',
-    'PredictModel', 'LoadValidate', 'Preprocessor', 'DatabaseOperation',
+    'TrainModel', 'ModelTuner', 'FileOperation',
+    'PredictModel', 'LoadValidate', 'Preprocessor',
     'HFUploader',
 }
 

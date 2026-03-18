@@ -43,27 +43,13 @@ class TrainModel:
         self.fileOperation = FileOperation(self.run_id, self.data_path, 'training')
 
     def training_model(self):
-        """
-        * method: trainingModel
-        * description: method to training the model
-        * return: none
-        *
-        * who             when           version  change (include bug# if apply)
-        * ----------      -----------    -------  ------------------------------
-        * VIVEK           11-MAR-2026    1.0      initial creation
-        * VIVEK           18-MAR-2026    2.0      removed clustering, added scaling
-        *
-        * Parameters
-        *   none:
-        """
         try:
-            self.logger.info('Start of Training')
-            self.logger.info('Run_id:' + str(self.run_id))
+            self.logger.info('Training started (run_id: %s)' % str(self.run_id))
 
-            # Load, validations and transformation
+            # Load, validate and transform
             self.loadValidate.validate_trainset()
 
-            # Preprocessing activities
+            # Preprocessing
             self.X, self.y = self.preProcess.preprocess_trainset()
 
             # Save column names for prediction alignment
@@ -75,45 +61,40 @@ class TrainModel:
             x_train, x_test, y_train, y_test = train_test_split(
                 self.X, self.y, test_size=0.2, stratify=self.y, random_state=42
             )
+            self.logger.info('Train: %d samples, Test: %d samples' % (len(x_train), len(x_test)))
 
-            # Scale features with MinMaxScaler
+            # Scale features
             scaler = MinMaxScaler()
             x_train_scaled = scaler.fit_transform(x_train)
             x_test_scaled = scaler.transform(x_test)
 
-            # Train RandomForest with best params (class_weight='balanced')
+            # Train RandomForest with best params
             best_model, metrics = self.modelTuner.train_best_model(
                 x_train_scaled, y_train, x_test_scaled, y_test
             )
 
             # Save model, scaler, and results
             os.makedirs('apps/models', exist_ok=True)
-
-            # Save the best model
             self.fileOperation.save_model(best_model, 'best_model')
-
-            # Save the scaler
             self.fileOperation.save_model(scaler, 'scaler')
 
-            # Save metrics to results.csv
             results_df = pd.DataFrame([metrics])
             results_df.to_csv('apps/models/results.csv', index=False)
-            self.logger.info('Saved results.csv with RandomForest metrics.')
+            self.logger.info('Results saved to results.csv')
 
-            # Upload models to Hugging Face
+            # Upload to Hugging Face
             try:
                 from apps.core.hf_uploader import HFUploader
-                self.logger.info('Starting Hugging Face Upload...')
                 uploader = HFUploader(logger=self.logger)
                 if uploader.upload_models():
-                    self.logger.info('Purging local apps/models after successful Hub upload...')
+                    self.logger.info('Models uploaded to Hugging Face Hub')
                     import shutil
                     shutil.rmtree('apps/models', ignore_errors=True)
             except Exception as e:
-                self.logger.exception(f'Failed to upload to Hugging Face Hub: {str(e)}')
+                self.logger.exception('HuggingFace upload failed: %s' % str(e))
 
-            self.logger.info('End of Training')
+            self.logger.info('Training complete')
             self.logger.info('TRAINING_COMPLETE')
         except Exception:
-            self.logger.exception('Unsuccessful End of Training')
+            self.logger.exception('Training failed')
             raise Exception

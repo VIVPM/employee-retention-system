@@ -5,6 +5,7 @@ matplotlib
 numpy
 pandas
 scikit-learn
+joblib
 kneed
 xgboost
 Jinja2

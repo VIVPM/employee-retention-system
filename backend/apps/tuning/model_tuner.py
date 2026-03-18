@@ -40,9 +40,8 @@ class ModelTuner:
         Returns: model, metrics_dict
         """
         try:
-            self.logger.info('Start of training RandomForest with best params...')
+            self.logger.info('Training RandomForest (class_weight=balanced)...')
 
-            # Best params from notebook GridSearchCV
             model = RandomForestClassifier(
                 n_estimators=150,
                 criterion='gini',
@@ -74,18 +73,12 @@ class ModelTuner:
                 })
             }
 
-            self.logger.info('RandomForest Accuracy: ' + str(metrics['Accuracy']))
-            self.logger.info('RandomForest Recall: ' + str(metrics['Recall']))
-            self.logger.info('RandomForest Precision: ' + str(metrics['Precision']))
-            self.logger.info('RandomForest F1: ' + str(metrics['F1_Score']))
-            self.logger.info('RandomForest AUC-ROC: ' + str(metrics['AUC_ROC']))
+            self.logger.info('Accuracy: %s | Recall: %s | F1: %s | AUC-ROC: %s' % (
+                metrics['Accuracy'], metrics['Recall'], metrics['F1_Score'], metrics['AUC_ROC']
+            ))
 
-            report = classification_report(test_y, y_pred)
-            self.logger.info('Classification Report:\n' + report)
-
-            self.logger.info('End of training RandomForest with best params.')
             return model, metrics
 
         except Exception as e:
-            self.logger.exception('Exception raised while training model: ' + str(e))
+            self.logger.exception('Model training failed: %s' % str(e))
             raise Exception()

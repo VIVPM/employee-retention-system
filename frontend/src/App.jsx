@@ -31,6 +31,11 @@ function App() {
   const [batchResults, setBatchResults] = useState(null)
   const [resultBlob, setResultBlob] = useState(null)
 
+  // Logs Viewer State
+  const [allLogs, setAllLogs] = useState([])
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [expandedLog, setExpandedLog] = useState(null)
+
   
   const [trainingLogs, setTrainingLogs] = useState([])
   const [isTraining, setIsTraining] = useState(false)
@@ -329,6 +334,20 @@ function App() {
     }
   }
 
+  const fetchAllLogs = async () => {
+    setLogsLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/logs`)
+      const data = await res.json()
+      setAllLogs(data.logs || [])
+    } catch (e) {
+      console.error("Could not fetch logs", e)
+      setAllLogs([])
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
   const handleDownload = () => {
     if (!resultBlob) return
     const url = window.URL.createObjectURL(resultBlob)
@@ -428,6 +447,12 @@ function App() {
             onClick={() => setActiveTab('batch_prediction')}
           >
             Batch Prediction
+          </button>
+          <button
+            className={`nav-btn ${activeTab === 'logs' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('logs'); fetchAllLogs(); }}
+          >
+            Logs
           </button>
         </div>
 
@@ -571,6 +596,89 @@ function App() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'logs' && (
+            <div className="logs-view">
+              <h3>Activity Logs</h3>
+              <p className="subtitle">All training and prediction logs sorted by most recent.</p>
+
+              <button
+                className="submit-btn"
+                onClick={fetchAllLogs}
+                disabled={logsLoading}
+                style={{ marginBottom: '1.5rem' }}
+              >
+                {logsLoading ? <span className="loader"></span> : 'Refresh Logs'}
+              </button>
+
+              {logsLoading && allLogs.length === 0 && (
+                <div className="alert alert-loading">Loading logs...</div>
+              )}
+
+              {!logsLoading && allLogs.length === 0 && (
+                <div className="alert alert-error">No logs found.</div>
+              )}
+
+              {allLogs.map((logEntry, idx) => (
+                <div key={idx} style={{ marginBottom: '10px' }}>
+                  <button
+                    onClick={() => setExpandedLog(expandedLog === idx ? null : idx)}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '12px 16px',
+                      backgroundColor: logEntry.type === 'training' ? 'rgba(59,130,246,0.1)' : 'rgba(16,185,129,0.1)',
+                      border: `1px solid ${logEntry.type === 'training' ? 'rgba(59,130,246,0.3)' : 'rgba(16,185,129,0.3)'}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      color: 'var(--text-color)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.9rem'
+                    }}
+                  >
+                    <span>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        marginRight: '10px',
+                        backgroundColor: logEntry.type === 'training' ? 'rgba(59,130,246,0.2)' : 'rgba(16,185,129,0.2)',
+                        color: logEntry.type === 'training' ? '#3b82f6' : '#10b981'
+                      }}>
+                        {logEntry.type.toUpperCase()}
+                      </span>
+                      {logEntry.timestamp}
+                    </span>
+                    <span>{expandedLog === idx ? '▲' : '▼'}</span>
+                  </button>
+
+                  {expandedLog === idx && (
+                    <div className="terminal-window" style={{ marginTop: '5px' }}>
+                      <div className="terminal-header">
+                        <div className="mac-buttons">
+                          <span className="mac-btn close"></span>
+                          <span className="mac-btn min"></span>
+                          <span className="mac-btn max"></span>
+                        </div>
+                        <div className="terminal-title">{logEntry.filename}</div>
+                      </div>
+                      <div className="terminal-body" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                        {logEntry.lines.map((line, i) => (
+                          <div key={i} className={`log-line ${line.includes('INFO') ? 'info' : line.includes('ERROR') ? 'error' : line.includes('SUCCESS') ? 'success' : ''}`}>
+                            <span className="prompt">{'> '}</span>{line}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
