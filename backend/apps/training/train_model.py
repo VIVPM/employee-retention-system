@@ -1,11 +1,13 @@
-from apps.core.logger import logging
-import  json
+import json
+import pandas as pd
+import os
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from apps.core.logger import logging
 from apps.core.file_operation import FileOperation
 from apps.tuning.model_tuner import ModelTuner
 from apps.ingestion.load_validate import LoadValidate
 from apps.preprocess.preprocessor import Preprocessor
-from apps.tuning.cluster import KMeansCluster
 
 
 class TrainModel:
@@ -13,7 +15,7 @@ class TrainModel:
     *****************************************************************************
     *
     * filename:       TrainModel.py
-    * version:        1.0
+    * version:        2.0
     * author:         VPM
     * creation date:  11-MAR-2026
     *
@@ -22,6 +24,8 @@ class TrainModel:
     * who             when           version  change (include bug# if apply)
     * ----------      -----------    -------  ------------------------------
     * VIVEK           11-MAR-2026    1.0      initial creation
+    * VIVEK           18-MAR-2026    2.0      removed clustering, added scaler,
+    *                                         single best model with class_weight=balanced
     *
     *
     * description:    Class to training the models
@@ -29,15 +33,14 @@ class TrainModel:
     ****************************************************************************
     """
 
-    def __init__(self,run_id,data_path):
+    def __init__(self, run_id, data_path):
         self.run_id = run_id
         self.data_path = data_path
         self.logger = logging.getLogger('TrainModel')
-        self.loadValidate = LoadValidate(self.run_id, self.data_path,'training')
-        self.preProcess = Preprocessor(self.run_id, self.data_path,'training')
+        self.loadValidate = LoadValidate(self.run_id, self.data_path, 'training')
+        self.preProcess = Preprocessor(self.run_id, self.data_path, 'training')
         self.modelTuner = ModelTuner(self.run_id, self.data_path, 'training')
         self.fileOperation = FileOperation(self.run_id, self.data_path, 'training')
-        self.cluster = KMeansCluster(self.run_id, self.data_path)
 
     def training_model(self):
         """
@@ -48,6 +51,7 @@ class TrainModel:
         * who             when           version  change (include bug# if apply)
         * ----------      -----------    -------  ------------------------------
         * VIVEK           11-MAR-2026    1.0      initial creation
+        * VIVEK           18-MAR-2026    2.0      removed clustering, added scaling
         *
         * Parameters
         *   none:
@@ -55,62 +59,46 @@ class TrainModel:
         try:
             self.logger.info('Start of Training')
             self.logger.info('Run_id:' + str(self.run_id))
-            #Load, validations and transformation
+
+            # Load, validations and transformation
             self.loadValidate.validate_trainset()
-            #preprocessing activities
+
+            # Preprocessing activities
             self.X, self.y = self.preProcess.preprocess_trainset()
-            columns = {"data_columns":[col for col in self.X.columns]}
-            with open('apps/database/columns.json','w') as f:
+
+            # Save column names for prediction alignment
+            columns = {"data_columns": [col for col in self.X.columns]}
+            with open('apps/database/columns.json', 'w') as f:
                 f.write(json.dumps(columns))
-            #create clusters
-            number_of_clusters = self.cluster.elbow_plot(self.X)
-            # Divide the data into clusters
-            self.X= self.cluster.create_clusters(self.X, number_of_clusters)
-            # create a new column in the dataset consisting of the corresponding cluster assignments.
-            self.X['Labels'] = self.y
-            # getting the unique clusters from our data set
-            list_of_clusters = self.X['Cluster'].unique()
-            
-            results_list = [] # to store metrics for Hugging Face
 
-            # parsing all the clusters and look for the best ML algorithm to fit on individual cluster
-            for i in list_of_clusters:
-                cluster_data=self.X[self.X['Cluster']==i] # filter the data for one cluster
+            # Train-test split (80/20, stratified)
+            x_train, x_test, y_train, y_test = train_test_split(
+                self.X, self.y, test_size=0.2, stratify=self.y, random_state=42
+            )
 
-                # Prepare the feature and Label columns
-                cluster_features=cluster_data.drop(['Labels','Cluster'],axis=1)
-                cluster_label= cluster_data['Labels']
+            # Scale features with MinMaxScaler
+            scaler = MinMaxScaler()
+            x_train_scaled = scaler.fit_transform(x_train)
+            x_test_scaled = scaler.transform(x_test)
 
-                # splitting the data into training and test set for each cluster one by one
-                try:
-                    x_train, x_test, y_train, y_test = train_test_split(cluster_features, cluster_label, test_size=0.2, random_state=0, stratify=cluster_label)
-                except ValueError:
-                    self.logger.info('Stratified split failed for cluster %s (too few samples in a class), falling back to regular split' % str(i))
-                    x_train, x_test, y_train, y_test = train_test_split(cluster_features, cluster_label, test_size=0.2, random_state=0)
-                #getting the best model for each of the clusters
-                best_model_name, best_model, all_results = self.modelTuner.get_best_model(x_train, y_train, x_test, y_test)
+            # Train RandomForest with best params (class_weight='balanced')
+            best_model, metrics = self.modelTuner.train_best_model(
+                x_train_scaled, y_train, x_test_scaled, y_test
+            )
 
-                #saving the best model to the directory.
-                save_model = self.fileOperation.save_model(best_model, best_model_name+str(i))
-                
-                # Append ALL model results (RandomForest + DT + LR + SVM) for this cluster
-                for r in all_results:
-                    results_list.append({
-                        'Cluster': i,
-                        'Model Name': r['model_name'],
-                        'Best Score Recall': r['score'],
-                        'Best Score AUC': r.get('auc', 'N/A'),
-                        'Best Parameters': str(r['params']),
-                        'Selected': 'Yes' if r['model_name'] == best_model_name else 'No'
-                    })
-
-            import pandas as pd
-            import os
-            # Save the results to results.csv
-            results_df = pd.DataFrame(results_list)
+            # Save model, scaler, and results
             os.makedirs('apps/models', exist_ok=True)
+
+            # Save the best model
+            self.fileOperation.save_model(best_model, 'best_model')
+
+            # Save the scaler
+            self.fileOperation.save_model(scaler, 'scaler')
+
+            # Save metrics to results.csv
+            results_df = pd.DataFrame([metrics])
             results_df.to_csv('apps/models/results.csv', index=False)
-            self.logger.info('Saved results.csv successfully with tuning metrics.')
+            self.logger.info('Saved results.csv with RandomForest metrics.')
 
             # Upload models to Hugging Face
             try:

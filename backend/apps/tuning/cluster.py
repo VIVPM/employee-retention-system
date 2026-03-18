@@ -94,7 +94,7 @@ class KMeansCluster:
             # saving the KMeans model to directory
             # passing 'Model' as the functions need three parameters
             self.data['Cluster']=self.y_kmeans  # create a new column in dataset for storing the cluster information
-            self.logger.info('succesfully created '+str(self.kn.knee)+ 'clusters.')
+            self.logger.info('succesfully created '+str(self.kn.knee)+ ' clusters.')
             self.logger.info('End of Create clusters...')
             return self.data
         except Exception as e:
